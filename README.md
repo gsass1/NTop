@@ -1,7 +1,7 @@
 # NTop
 htop-like system-monitor for Windows. Because using Task Manager is not cool enough.
 
-![NTop](https://user-images.githubusercontent.com/4589491/28242297-f1df6cea-69a7-11e7-83af-03e40f4bdad4.PNG)
+![NTop](https://user-images.githubusercontent.com/4589491/28242345-6a8fe79a-69a9-11e7-96d6-b1af9db9309c.png)
 
 NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 
