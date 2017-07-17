@@ -26,6 +26,9 @@
 #include <stdio.h>
 
 #define NTOP_VER "0.0.1"
+#define SCROLL_INTERVAL 20ULL
+#define REDRAW_INTERVAL 1000ULL
+#define INPUT_LOOP_DELAY 30
 
 static int Width;
 static int Height;
@@ -506,6 +509,9 @@ static void DisableCursor(void)
 	SetConsoleCursorInfo(ConsoleHandle, &CursorInfo);
 }
 
+/*
+ * Returns TRUE on screen buffer resize.
+ */
 static BOOL PollConsoleInfo(void)
 {
 	CONSOLE_SCREEN_BUFFER_INFO Csbi;
@@ -626,8 +632,7 @@ static void FormatTimeString(TCHAR *Buffer, ULONGLONG MS)
 
 static void WriteBlankLine(void)
 {
-	for(int i = 0; i < Width; i++)
-		putchar(' ');
+	_tprintf(_T("%*c"), Width, ' ');
 }
 
 static BOOL WINAPI CtrlHandler(DWORD signal)
@@ -754,6 +759,77 @@ static void WriteProcessInfo(const process *Process)
 	_tprintf(_T("%*c"), Width-CharsWritten+1, ' ');
 }
 
+static void ExecCommand(TCHAR *Command)
+{
+	STARTUPINFO StartupInfo;
+	PROCESS_INFORMATION ProcInfo;
+	ZeroMemory(&StartupInfo, sizeof(StartupInfo));
+	ZeroMemory(&ProcInfo, sizeof(ProcInfo));
+	StartupInfo.cb = sizeof(StartupInfo);
+
+	BOOL Ret = CreateProcess(NULL, Command, NULL, NULL, FALSE, 0, NULL, NULL, &StartupInfo, &ProcInfo);
+
+	/* TODO: show error message when failed */
+}
+
+static ULONGLONG KeyPressStart = 0;
+static ULONGLONG LastKeyPress = 0;
+static BOOL KeyPress = FALSE;
+static DWORD OldSelectedProcessIndex = 0;
+static BOOL RedrawAtCursor = FALSE;
+
+typedef enum scroll_type {
+	SCROLL_UP,
+	SCROLL_DOWN
+} scroll_type;
+
+static void DoScroll(scroll_type ScrollType)
+{
+	ULONGLONG Now = GetTickCount64();
+
+	if(!KeyPress) {
+		KeyPress = TRUE;
+		KeyPressStart = Now;
+	}
+
+	/*
+	 * In order to enforce a one-time delay when scrolling, scroll only
+	 * if this is the instant we pressed the key or at any time 500ms thereafter.
+	 */
+	if(Now == KeyPressStart || Now - KeyPressStart > 500) {
+		BOOL Scrolled = FALSE;
+
+		switch(ScrollType) {
+		case SCROLL_UP:
+			if(SelectedProcessIndex != 0) {
+				Scrolled = TRUE;
+				SelectedProcessIndex--;
+				if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
+					ProcessIndex--;
+				}
+			}
+			break;
+		case SCROLL_DOWN:
+			if(SelectedProcessIndex != ProcessCount-1) {
+				Scrolled = TRUE;
+				SelectedProcessIndex++;
+				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
+					if(ProcessIndex <= ProcessCount - ProcessWindowHeight - 1) {
+						ProcessIndex++;
+					}
+				}
+			}
+			break;
+		}
+
+		if(Scrolled) {
+			RedrawAtCursor = TRUE;
+			OldSelectedProcessIndex = SelectedProcessIndex;
+			LastKeyPress = GetTickCount64();
+		}
+	}
+}
+
 static void PrintVersion(void)
 {
 	_tprintf(_T("NTop " NTOP_VER " - (C) 2017 Gian Sass\n"));
@@ -877,11 +953,6 @@ int _tmain(int argc, TCHAR *argv[])
 
 	TCHAR MenuBar[256] = { 0 };
 	wsprintf(MenuBar, _T("NTop on %s"), ComputerName);
-
-	ULONGLONG StartTicks = GetTickCount64();
-	ULONGLONG LastKeyPress = 0;
-	ULONGLONG KeyPressStart = 0;
-	BOOL KeyPress = FALSE;
 
 	BOOL InInputMode = FALSE;
 	TCHAR Input[256] = { 0 };
@@ -1033,56 +1104,34 @@ int _tmain(int argc, TCHAR *argv[])
 		OutputDebugString(DebugBuffer);
 #endif
 
-		DWORD OldSelectedProcessIndex = 0;
 		process_sort_type NewProcessSortType = ProcessSortType;
+		ULONGLONG StartTicks = GetTickCount64();
 
-		while(TRUE) {
-			BOOL RedrawAtCursor = FALSE;
+		/*
+		 * Input loop. Breaks after REDRAW_INTERVAL ms or if forced.
+		 */
+		while(1) {
+			/*
+			 * Whether or not to redraw the selected process
+			 * (and the process at OldSelectedProcessIndex).
+			 *
+			 * This allows us not having to redraw the whole buffer
+			 * at each scroll.
+			 */
+			RedrawAtCursor = FALSE;
+
 			if(!InInputMode) {
-				if(GetTickCount64() - LastKeyPress >= 20LL) {
-					ULONGLONG Now = GetTickCount64();
+				if(GetTickCount64() - LastKeyPress >= SCROLL_INTERVAL) {
 					if(GetAsyncKeyState(VK_UP) || GetAsyncKeyState(VK_PRIOR)) {
-						if(!KeyPress) {
-							KeyPress = TRUE;
-							KeyPressStart = GetTickCount64();
-						}
-						if(Now == KeyPressStart || Now - KeyPressStart > 500) {
-							if(SelectedProcessIndex != 0) {
-								RedrawAtCursor = TRUE;
-								OldSelectedProcessIndex = SelectedProcessIndex;
-								SelectedProcessIndex--;
-								LastKeyPress = GetTickCount64();
-
-								if(SelectedProcessIndex <= ProcessIndex - 1) {
-									if(ProcessIndex != 0) {
-										ProcessIndex--;
-										break;
-									}
-								}
-							}
-						}
+						DoScroll(SCROLL_UP);
 					} else if(GetAsyncKeyState(VK_DOWN) || GetAsyncKeyState(VK_NEXT)) {
-						if(!KeyPress) {
-							KeyPress = TRUE;
-							KeyPressStart = Now; 
-						}
-
-						if(Now == KeyPressStart || Now - KeyPressStart > 500) {
-							if(SelectedProcessIndex != ProcessCount-1) {
-								RedrawAtCursor = TRUE;
-								OldSelectedProcessIndex = SelectedProcessIndex;
-								SelectedProcessIndex++;
-								LastKeyPress = GetTickCount64();
-							}
-							if(SelectedProcessIndex-ProcessIndex >= ProcessWindowHeight - 2) {
-								if(ProcessIndex <= ProcessCount-1-ProcessWindowHeight) {
-									ProcessIndex++;
-									break;
-								}
-							}
-						}
+						DoScroll(SCROLL_DOWN);
 					} else {
 						KeyPress = FALSE;
+					}
+
+					if(RedrawAtCursor) {
+						break;
 					}
 				}
 
@@ -1162,22 +1211,13 @@ int _tmain(int argc, TCHAR *argv[])
 					char c = _getch();
 					if(c == '\n' || c == '\r') {
 						switch(InputMode) {
-							case EXEC: {
-								STARTUPINFO StartupInfo;
-								PROCESS_INFORMATION ProcInfo;
-								ZeroMemory(&StartupInfo, sizeof(StartupInfo));
-								ZeroMemory(&ProcInfo, sizeof(ProcInfo));
-								StartupInfo.cb = sizeof(StartupInfo);
-
-								CreateProcess(NULL, Input, NULL, NULL, FALSE, 0, NULL, NULL, &StartupInfo, &ProcInfo);
-
-								break;
-							}
-
-							InputIndex = 0;
-							Input[0] = '\0';
+						case EXEC:
+							ExecCommand(Input);
+							break;
 						}
 
+						InputIndex = 0;
+						Input[0] = '\0';
 						InInputMode = FALSE;
 						break;
 					} else {
@@ -1200,15 +1240,24 @@ int _tmain(int argc, TCHAR *argv[])
 					}
 				}
 			}
-			if(GetTickCount64() - StartTicks >= 1000LL) {
+
+			if(PollConsoleInfo()) {
+				break;
+			}
+
+			if(GetTickCount64() - StartTicks >= REDRAW_INTERVAL) {
 				PollSystemInfo();
 				StartTicks = GetTickCount64();
 				break;
 			}
-			Sleep(30);
-			if(PollConsoleInfo()) break;
+
+			Sleep(INPUT_LOOP_DELAY);
 		}
 
+		/*
+		 * When process sort type changed, immediately sort the process list
+		 * as waiting for the update thread would not be instantaneous.
+		 */
 		if(NewProcessSortType != ProcessSortType) {
 			EnterCriticalSection(&SyncLock);
 			ProcessSortType = NewProcessSortType;
