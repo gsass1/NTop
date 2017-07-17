@@ -12,6 +12,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | ------------- | ------------- |
 | -C			| Use monochrome color scheme.  |
 | -h			| Display help info.  |
+| -p PID,PID...	| Show only the given PIDs.  |
 | -s COLUMN		| Sort by this column.  |
 | -u USERNAME	| Only display processes belonging to this user. |
 | -v			| Print version.  |

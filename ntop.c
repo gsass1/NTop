@@ -330,6 +330,10 @@ static void SortProcessList(void)
 static BOOL FilterByUserName = FALSE;
 static TCHAR FilterUserName[UNLEN];
 
+static BOOL FilterByPID = FALSE;
+static DWORD PidFilterList[1024];
+static DWORD PidFilterCount;
+
 static void PollProcessList(void)
 {
 	HANDLE Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, 0);
@@ -347,7 +351,7 @@ static void PollProcessList(void)
 
 	DWORD i = 0;
 
-	while(Status) {
+	for(; Status; Status = Process32Next(Snapshot, &Entry)) {
 		process Process = { 0 };
 		Process.ID = Entry.th32ProcessID;
 		Process.ThreadCount = Entry.cntThreads;
@@ -387,18 +391,26 @@ static void PollProcessList(void)
 			}
 		}
 
-		if(!(FilterByUserName && lstrcmpi(Process.UserName, FilterUserName) != 0)) {
-			NewProcessList[i++] = Process;
+		if(FilterByUserName && lstrcmpi(Process.UserName, FilterUserName) != 0) {
+			continue;
 		}
 
-		Status = Process32Next(Snapshot, &Entry);
+		if(FilterByPID) {
+			BOOL InFilter = FALSE;
+			for(DWORD i = 0; i < PidFilterCount; i++) {
+				if(PidFilterList[i] == Process.ID) {
+					InFilter = TRUE;
+				}
+			}
 
-#if 0
-		if(!Status) {
-			Die(_T("Process32Next failed: %ld\n"), GetLastError());
+			if(!InFilter) {
+				continue;
+			}
 		}
-#endif
+
+		NewProcessList[i++] = Process;
 	}
+
 	CloseHandle(Snapshot);
 
 	DWORD NewProcessCount = i;
@@ -771,6 +783,7 @@ int _tmain(int argc, TCHAR *argv[])
 				_tprintf(_T("Options:\n"));
 				_tprintf(_T("\t-C\tUse a monochrome color scheme\n"));
 				_tprintf(_T("\t-h\tDisplay this\n"));
+				_tprintf(_T("\t-p PID,PID...\n\t\tShow only the given PIDs\n"));
 				_tprintf(_T("\t-s COLUMN\n\t\tSort by this column\n"));
 				_tprintf(_T("\t-u USERNAME\n\t\tDisplay only the processes of this user\n"));
 				_tprintf(_T("\t-v\tPrint version\n"));
@@ -823,6 +836,21 @@ int _tmain(int argc, TCHAR *argv[])
 			case 'v':
 				PrintVersion();
 				return EXIT_SUCCESS;
+			case 'p':
+				if(++i < argc) {
+					const TCHAR *Delim = _T(",");
+					TCHAR *Context;
+					TCHAR *Token = _tcstok_s(argv[i], Delim, &Context);
+					while(Token) {
+						PidFilterList[PidFilterCount++] = (DWORD)_tstoi(Token);
+						Token = _tcstok_s(NULL, Delim, &Context);
+					}
+
+					if(PidFilterCount != 0) {
+						FilterByPID = TRUE;
+					}
+				}
+				break;
 			default:
 				_tprintf(_T("Unknown option: '%c'"), argv[i][1]);
 				return EXIT_FAILURE;
