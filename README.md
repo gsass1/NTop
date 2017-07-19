@@ -34,6 +34,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | F7 								   | Execute a command.  |
 | F9 								   | Kill all tagged processes.  |
 | F10, q 						       | Quit.  |
+| I 								   | Invert the sort order.  |
 
 ## Configuration
 The color scheme can be customized through the [ntop.conf](ntop.conf) file. Follow link for example.

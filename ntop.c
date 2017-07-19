@@ -222,46 +222,77 @@ static DWORD ProcessIndex = 0;
 static DWORD SelectedProcessIndex = 0;
 static DWORD SelectedProcessID = 0;
 
+typedef enum sort_order {
+	ASCENDING,
+	DESCENDING
+} sort_order;
+
+static sort_order SortOrder = DESCENDING;
+
 typedef int (*process_sort_fn_t)(const void *, const void *);
 
 static int SortProcessByID(const void *A, const void *B)
 {
-	return ((const process *)B)->ID - ((const process *)A)->ID;
+	if(SortOrder == ASCENDING)
+		return ((const process *)A)->ID - ((const process *)B)->ID;
+	else
+		return ((const process *)B)->ID - ((const process *)A)->ID;
 }
 
 static int SortProcessByExe(const void *A, const void *B)
 {
-	return _tcsncmp(((const process *)A)->ExeName, ((const process *)B)->ExeName, MAX_PATH);
+	if(SortOrder == ASCENDING)
+		return _tcsncmp(((const process *)A)->ExeName, ((const process *)B)->ExeName, MAX_PATH);
+	else
+		return _tcsncmp(((const process *)B)->ExeName, ((const process *)A)->ExeName, MAX_PATH);
 }
 
 static int SortProcessByUserName(const void *A, const void *B)
 {
-	return _tcsncmp(((const process *)A)->UserName, ((const process *)B)->UserName, UNLEN);
+	if(SortOrder == ASCENDING)
+		return _tcsncmp(((const process *)A)->UserName, ((const process *)B)->UserName, UNLEN);
+	else
+		return _tcsncmp(((const process *)B)->UserName, ((const process *)A)->UserName, UNLEN);
 }
 
 static int SortProcessByProcessorTime(const void *A, const void *B)
 {
-	return (int)(((const process *)B)->PercentProcessorTime - ((const process *)A)->PercentProcessorTime);
+	if(SortOrder == ASCENDING)
+		return (int)(((const process *)A)->PercentProcessorTime - ((const process *)A)->PercentProcessorTime);
+	else
+		return (int)(((const process *)B)->PercentProcessorTime - ((const process *)A)->PercentProcessorTime);
 }
 
 static int SortProcessByUsedMemory(const void *A, const void *B)
 {
-	return (int)(((const process *)B)->UsedMemory - ((const process *)A)->UsedMemory);
+	if(SortOrder == ASCENDING)
+		return (int)(((const process *)A)->UsedMemory - ((const process *)B)->UsedMemory);
+	else
+		return (int)(((const process *)B)->UsedMemory - ((const process *)A)->UsedMemory);
 }
 
 static int SortProcessByUpTime(const void *A, const void *B)
 {
-	return (int)(((const process *)B)->UpTime - ((const process *)A)->UpTime);
+	if(SortOrder == ASCENDING)
+		return (int)(((const process *)A)->UpTime - ((const process *)B)->UpTime);
+	else
+		return (int)(((const process *)B)->UpTime - ((const process *)A)->UpTime);
 }
 
 static int SortProcessByPriority(const void *A, const void *B)
 {
-	return (int)(((const process *)B)->BasePriority - ((const process *)A)->BasePriority);
+	if(SortOrder == ASCENDING)
+		return (int)(((const process *)A)->BasePriority - ((const process *)B)->BasePriority);
+	else
+		return (int)(((const process *)B)->BasePriority - ((const process *)A)->BasePriority);
 }
 
 static int SortProcessByThreadCount(const void *A, const void *B)
 {
-	return (int)(((const process *)B)->ThreadCount - ((const process *)A)->ThreadCount);
+	if(SortOrder == ASCENDING)
+		return (int)(((const process *)A)->ThreadCount - ((const process *)B)->ThreadCount);
+	else
+		return (int)(((const process *)B)->ThreadCount - ((const process *)A)->ThreadCount);
 }
 
 typedef enum process_sort_type {
@@ -878,6 +909,7 @@ int _tmain(int argc, TCHAR *argv[])
 				_tprintf(_T("\tF7\tExecute a command.\n"));
 				_tprintf(_T("\tF9\tKill all tagged processes.\n"));
 				_tprintf(_T("\tF10, q\tQuit.\n"));
+				_tprintf(_T("\tI\tInvert the sort order.\n"));
 				return EXIT_SUCCESS;
 			case 's':
 				if(++i < argc) {
@@ -1105,6 +1137,7 @@ int _tmain(int argc, TCHAR *argv[])
 #endif
 
 		process_sort_type NewProcessSortType = ProcessSortType;
+		BOOL SortOrderChanged = FALSE;
 		ULONGLONG StartTicks = GetTickCount64();
 
 		/*
@@ -1149,6 +1182,15 @@ int _tmain(int argc, TCHAR *argv[])
 						TaggedProcessesCount = 0;
 						break;
 					}
+				} else if(GetAsyncKeyState(VK_SHIFT) && GetAsyncKeyState(0x49) == -32767) /* i */ {
+					EnterCriticalSection(&SyncLock);
+					if(SortOrder == ASCENDING)
+						SortOrder = DESCENDING;
+					else
+						SortOrder = ASCENDING;
+					SortProcessList();
+					LeaveCriticalSection(&SyncLock);
+					break;
 				} else if(GetAsyncKeyState(VK_SPACE) == -32767) {
 					ToggleTaggedProcess(ProcessList[SelectedProcessIndex].ID);
 					RedrawAtCursor = TRUE;
