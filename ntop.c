@@ -814,7 +814,7 @@ typedef enum scroll_type {
 	SCROLL_DOWN
 } scroll_type;
 
-static void DoScroll(scroll_type ScrollType)
+static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 {
 	ULONGLONG Now = GetTickCount64();
 
@@ -830,6 +830,7 @@ static void DoScroll(scroll_type ScrollType)
 	if(Now == KeyPressStart || Now - KeyPressStart > 500) {
 		BOOL Scrolled = FALSE;
 
+		OldSelectedProcessIndex = SelectedProcessIndex;
 		switch(ScrollType) {
 		case SCROLL_UP:
 			if(SelectedProcessIndex != 0) {
@@ -837,6 +838,7 @@ static void DoScroll(scroll_type ScrollType)
 				SelectedProcessIndex--;
 				if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
 					ProcessIndex--;
+					*Redraw = TRUE;
 				}
 			}
 			break;
@@ -847,6 +849,7 @@ static void DoScroll(scroll_type ScrollType)
 				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
 					if(ProcessIndex <= ProcessCount - ProcessWindowHeight - 1) {
 						ProcessIndex++;
+						*Redraw = TRUE;
 					}
 				}
 			}
@@ -855,7 +858,6 @@ static void DoScroll(scroll_type ScrollType)
 
 		if(Scrolled) {
 			RedrawAtCursor = TRUE;
-			OldSelectedProcessIndex = SelectedProcessIndex;
 			LastKeyPress = GetTickCount64();
 		}
 	}
@@ -1155,15 +1157,17 @@ int _tmain(int argc, TCHAR *argv[])
 
 			if(!InInputMode) {
 				if(GetTickCount64() - LastKeyPress >= SCROLL_INTERVAL) {
+					BOOL Redraw = FALSE;
+
 					if(GetAsyncKeyState(VK_UP) || GetAsyncKeyState(VK_PRIOR)) {
-						DoScroll(SCROLL_UP);
+						DoScroll(SCROLL_UP, &Redraw);
 					} else if(GetAsyncKeyState(VK_DOWN) || GetAsyncKeyState(VK_NEXT)) {
-						DoScroll(SCROLL_DOWN);
+						DoScroll(SCROLL_DOWN, &Redraw);
 					} else {
 						KeyPress = FALSE;
 					}
 
-					if(RedrawAtCursor) {
+					if(Redraw) {
 						break;
 					}
 				}
