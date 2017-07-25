@@ -1022,15 +1022,35 @@ int _tmain(int argc, TCHAR *argv[])
 
 		CharsWritten += DrawPercentageBar(_T("CPU"), CPUUsage, Config.CPUBarColor);
 
-		SetColor(Config.FGHighlightColor);
-		CharsWritten += _tprintf(_T("  Name: "));
-		SetColor(Config.FGColor);
-		CharsWritten +=	_tprintf(_T("%s (%u Cores)"), CPUName, CPUCoreCount);
+		int CPUInfoChars = 0;
+
+		TCHAR CPUNameBuf[] = _T("  Name:  ");
+		CPUInfoChars += _tcslen(CPUNameBuf);
+
+		TCHAR CPUInfoBuf[256];
+		CPUInfoChars += wsprintf(CPUInfoBuf, _T("%s (%u Cores)"), CPUName, CPUCoreCount);
+
+		int TaskInfoChars = 0;
+
+		TCHAR TasksNameBuf[] = _T("  Tasks: ");
+		TaskInfoChars += _tcsclen(TasksNameBuf);
+
+		TCHAR TasksInfoBuf[256];
+		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u"), ProcessCount);
+
+		if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) {
+			SetColor(Config.FGHighlightColor);
+			_tprintf(_T("%s"), CPUNameBuf);
+			SetColor(Config.FGColor);
+			_tprintf(_T("%s"), CPUInfoBuf);
+			CharsWritten += CPUInfoChars;
+		}
 
 		SetColor(Config.FGHighlightColor);
-		CharsWritten +=	_tprintf(_T("  Tasks: "));
+		_tprintf(_T("%s"), TasksNameBuf);
 		SetColor(Config.FGColor);
-		CharsWritten +=	_tprintf(_T("%u"), ProcessCount);
+		_tprintf(_T("%s"), TasksInfoBuf);
+		CharsWritten += TaskInfoChars;
 
 		for(; CharsWritten < Width; CharsWritten++) {
 			putchar(' ');
