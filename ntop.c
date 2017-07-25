@@ -218,6 +218,7 @@ static BOOL IsProcessTagged(DWORD ID)
 }
 
 static DWORD ProcessCount = 0;
+static DWORD RunningProcessCount = 0;
 static DWORD ProcessIndex = 0;
 static DWORD SelectedProcessIndex = 0;
 static DWORD SelectedProcessID = 0;
@@ -483,6 +484,8 @@ static void PollProcessList(void)
 	ULONGLONG SysUserDiff = SubtractTimes(&SysTimes.UserTime, &PrevSysTimes.UserTime);
 	ULONGLONG SysIdleDiff = SubtractTimes(&SysTimes.IdleTime, &PrevSysTimes.IdleTime);
 
+	RunningProcessCount = 0;
+
 	for(DWORD i = 0; i < NewProcessCount; i++) {
 		process_times ProcessTime = { 0 };
 		process_times *PrevProcessTime = &ProcessTimes[i];
@@ -498,6 +501,9 @@ static void PollProcessList(void)
 
 			if(TotalSys > 0) {
 				Process->PercentProcessorTime = (double)((100.0 * (double)TotalProc) / (double)TotalSys);
+				if(Process->PercentProcessorTime >= 0.01) {
+					RunningProcessCount++;
+				}
 			}
 
 			FILETIME SysTime;
@@ -1036,7 +1042,7 @@ int _tmain(int argc, TCHAR *argv[])
 		TaskInfoChars += _tcsclen(TasksNameBuf);
 
 		TCHAR TasksInfoBuf[256];
-		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u"), ProcessCount);
+		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u total, %u running"), ProcessCount, RunningProcessCount);
 
 		if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) {
 			SetColor(Config.FGHighlightColor);
