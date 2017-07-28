@@ -1166,7 +1166,7 @@ int _tmain(int argc, TCHAR *argv[])
 
 		int CPUInfoChars = 0;
 
-		TCHAR CPUNameBuf[] = _T("  Name:  ");
+		TCHAR CPUNameBuf[] = _T("  Name: ");
 		CPUInfoChars += _tcslen(CPUNameBuf);
 
 		TCHAR CPUInfoBuf[256];
