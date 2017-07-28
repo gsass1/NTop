@@ -161,8 +161,11 @@ static void ReadConfigFile(void)
 	fclose(File);
 }
 
-static inline void SetColor(WORD Color)
+static WORD CurrentColor;
+
+static void SetColor(WORD Color)
 {
+	CurrentColor = Color;
 	SetConsoleTextAttribute(ConsoleHandle, Color);
 }
 
@@ -182,6 +185,8 @@ typedef struct process {
 	DWORD ThreadCount;
 	ULONGLONG UpTime;
 	TCHAR ExeName[MAX_PATH];
+	DWORD ParentPID;
+	DWORD TreeDepth;
 } process;
 
 /*
@@ -296,6 +301,11 @@ static int SortProcessByThreadCount(const void *A, const void *B)
 		return (int)(((const process *)B)->ThreadCount - ((const process *)A)->ThreadCount);
 }
 
+static int SortProcessByParentPID(const void *A, const void *B)
+{
+	return (int)(((const process *)A)->ParentPID - ((const process *)B)->ParentPID);
+}
+
 typedef enum process_sort_type {
 	SORT_BY_ID,
 	SORT_BY_USER_NAME,
@@ -305,6 +315,7 @@ typedef enum process_sort_type {
 	SORT_BY_THREAD_COUNT,
 	SORT_BY_UPTIME,
 	SORT_BY_EXE,
+	SORT_BY_TREE,
 } process_sort_type;
 
 static process_sort_type ProcessSortType = SORT_BY_ID;
@@ -328,37 +339,128 @@ static ULONGLONG SubtractTimes(const FILETIME *A, const FILETIME *B)
 
 static void SortProcessList(void)
 {
-	process_sort_fn_t SortFn = NULL;
+	if(ProcessSortType != SORT_BY_TREE)
+	{
+		process_sort_fn_t SortFn = NULL;
 
-	switch(ProcessSortType) {
-	case SORT_BY_ID:
-		SortFn = SortProcessByID;
-		break;
-	case SORT_BY_EXE:
-		SortFn = SortProcessByExe;
-		break;
-	case SORT_BY_USER_NAME:
-		SortFn = SortProcessByUserName;
-		break;
-	case SORT_BY_PROCESSOR_TIME:
-		SortFn = SortProcessByProcessorTime;
-		break;
-	case SORT_BY_USED_MEMORY:
-		SortFn = SortProcessByUsedMemory;
-		break;
-	case SORT_BY_UPTIME:
-		SortFn = SortProcessByUpTime;
-		break;
-	case SORT_BY_PRIORITY:
-		SortFn = SortProcessByPriority;
-		break;
-	case SORT_BY_THREAD_COUNT:
-		SortFn = SortProcessByThreadCount;
-		break;
-	}
+		switch(ProcessSortType) {
+		case SORT_BY_ID:
+			SortFn = SortProcessByID;
+			break;
+		case SORT_BY_EXE:
+			SortFn = SortProcessByExe;
+			break;
+		case SORT_BY_USER_NAME:
+			SortFn = SortProcessByUserName;
+			break;
+		case SORT_BY_PROCESSOR_TIME:
+			SortFn = SortProcessByProcessorTime;
+			break;
+		case SORT_BY_USED_MEMORY:
+			SortFn = SortProcessByUsedMemory;
+			break;
+		case SORT_BY_UPTIME:
+			SortFn = SortProcessByUpTime;
+			break;
+		case SORT_BY_PRIORITY:
+			SortFn = SortProcessByPriority;
+			break;
+		case SORT_BY_THREAD_COUNT:
+			SortFn = SortProcessByThreadCount;
+			break;
+		}
 
-	if(SortFn) {
-		qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortFn);
+		if(SortFn) {
+			qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortFn);
+		}
+	} else {
+		qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortProcessByParentPID);
+
+		for(DWORD i = 0; i < ProcessCount; i++) {
+			ProcessList[i].TreeDepth = 0;
+		}
+
+		for(DWORD i = 0; i < ProcessCount; i++) {
+			DWORD ID = ProcessList[i].ID;
+			DWORD Start = 0;
+			DWORD End = 0;
+
+			for(DWORD j = i + 1; j < ProcessCount; j++) {
+				if(ProcessList[j].ParentPID == ID) {
+					Start = j;
+					while(++j < ProcessCount && ProcessList[j].ParentPID == ID)
+						;
+					End = j;
+					break;
+				}
+
+				if(Start != 0)
+					break;
+			}
+
+			if(Start != 0) {
+				DWORD Size = End - Start;
+
+				/* We want to insert the process group right after this process, thus i+1 */
+				DWORD InsLoc = i + 1;
+
+				/* We have to move all processes that come after i by Size items */
+				DWORD TmpLoc = InsLoc + Size;
+
+				if(Start == InsLoc)
+					/* Process group is already right where we want it to be */
+					goto Next;
+
+				/* Move all processes */
+
+				/*
+				 * TODO: This will cease to work if we start dynamically allocating the process list
+				 * because then we have to allocate another buffer in which to store the extra processes.
+				 */
+				for(DWORD j = ProcessCount+Size-1; j >= TmpLoc && j != 0; j--) {
+					ProcessList[j] = ProcessList[j-Size];
+				}
+
+#ifdef DEBUG_TREESORT
+				/* Memory at InsLoc->InsLoc+Size and TmpLoc+Size should be identical now */
+				for(DWORD j = InsLoc; j < TmpLoc; j++) {
+					assert(ProcessList[j].ID == ProcessList[j+Size].ID);
+				}
+#endif
+
+				/* Copy process group in */
+				for(DWORD j = 0; j < Size; j++) {
+					ProcessList[j+InsLoc] = ProcessList[Size+Start+j];
+				}
+
+				/* Fill gap at Start -> End */
+				for(DWORD j = Start+Size; j < ProcessCount; j++) {
+					ProcessList[j] = ProcessList[j+Size];
+				}
+
+#ifdef DEBUG_TREESORT
+				/* Check no mistakes */
+				for(DWORD j = 0; j < Size-1; j++) {
+					assert(ProcessList[j+InsLoc].ParentPID == ID);
+				}
+
+				/* Check no dups */
+				for(DWORD j = 0; j < ProcessCount; j++) {
+					for(DWORD k = 0; k < ProcessCount; k++) {
+						if(j != k) {
+							assert(ProcessList[j].ID != ProcessList[k].ID);
+						}
+					}
+				}
+#endif
+
+Next:
+				/* Set tree depth */
+				for(DWORD j = 0; j < Size; j++) {
+					ProcessList[j+InsLoc].TreeDepth = ProcessList[i].TreeDepth+1;
+				}
+			}
+		}
 	}
 }
 
@@ -389,8 +491,11 @@ static void PollProcessList(void)
 	for(; Status; Status = Process32Next(Snapshot, &Entry)) {
 		process Process = { 0 };
 		Process.ID = Entry.th32ProcessID;
+		if(Process.ID == 0)
+			continue;
 		Process.ThreadCount = Entry.cntThreads;
 		Process.BasePriority = Entry.pcPriClassBase;
+		Process.ParentPID = Entry.th32ParentProcessID;
 
 		_tcsncpy_s(Process.ExeName, MAX_PATH, Entry.szExeFile, MAX_PATH);
 		_tcsncpy_s(Process.UserName, UNLEN, _T("SYSTEM"), UNLEN);
@@ -760,7 +865,7 @@ static void RestoreConsole(void)
 	SetConsoleCursorInfo(ConsoleHandle, &CursorInfo);
 }
 
-static void SetupProcessColor(const process *Process, BOOL Highlighted)
+static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 {
 	WORD Color = Config.FGColor;
 	BOOL Selected = IsProcessTagged(Process->ID);
@@ -774,23 +879,51 @@ static void SetupProcessColor(const process *Process, BOOL Highlighted)
 		Color = Config.BGColor;
 	}
 	SetColor(Color);
-}
 
-static void WriteProcessInfo(const process *Process)
-{
+	int CharsWritten = 0;
 	TCHAR UpTimeStr[TIME_STR_SIZE];
 	FormatTimeString(UpTimeStr, Process->UpTime);
 
-	int CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s  %s"),
-			Process->ID,
-			Process->UserName,
-			Process->BasePriority,
-			Process->PercentProcessorTime,
-			(double)Process->UsedMemory / 1000000.0,
-			Process->ThreadCount,
-			UpTimeStr,
-			Process->ExeName
-			);
+	if(ProcessSortType == SORT_BY_TREE) {
+		TCHAR OffsetStr[256] = { 0 };
+		if(Process->TreeDepth > 0) {
+			for(DWORD i = 0; i < Process->TreeDepth-1; i++) {
+				_tcscat_s(OffsetStr, _countof(OffsetStr), _T("|  "));
+			}
+			_tcscat_s(OffsetStr, _countof(OffsetStr), _T("`- "));
+		}
+
+		CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s"),
+				Process->ID,
+				Process->UserName,
+				Process->BasePriority,
+				Process->PercentProcessorTime,
+				(double)Process->UsedMemory / 1000000.0,
+				Process->ThreadCount,
+				UpTimeStr
+				);
+		WORD Color = CurrentColor;
+
+		if(!Highlighted) {
+			SetColor(Config.FGHighlightColor);
+		}
+
+		CharsWritten += _tprintf(_T("  %s"), OffsetStr);
+		SetColor(Color);
+
+		CharsWritten += _tprintf(_T("%s"), Process->ExeName);
+	} else {
+		CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s %s"),
+				Process->ID,
+				Process->UserName,
+				Process->BasePriority,
+				Process->PercentProcessorTime,
+				(double)Process->UsedMemory / 1000000.0,
+				Process->ThreadCount,
+				UpTimeStr,
+				Process->ExeName
+				);
+	}
 
 
 	_tprintf(_T("%*c"), Width-CharsWritten+1, ' ');
@@ -841,6 +974,7 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 		case SCROLL_UP:
 			if(SelectedProcessIndex != 0) {
 				Scrolled = TRUE;
+				OldSelectedProcessIndex = SelectedProcessIndex;
 				SelectedProcessIndex--;
 				if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
 					ProcessIndex--;
@@ -851,6 +985,7 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 		case SCROLL_DOWN:
 			if(SelectedProcessIndex != ProcessCount-1) {
 				Scrolled = TRUE;
+				OldSelectedProcessIndex = SelectedProcessIndex;
 				SelectedProcessIndex++;
 				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
 					if(ProcessIndex <= ProcessCount - ProcessWindowHeight - 1) {
@@ -915,6 +1050,7 @@ int _tmain(int argc, TCHAR *argv[])
 				_tprintf(_T("\tF5\tSort list by memory usage.\n"));
 				_tprintf(_T("\tF6\tSort list by uptime.\n"));
 				_tprintf(_T("\tF7\tExecute a command.\n"));
+				_tprintf(_T("\tF8\tView process tree.\n"));
 				_tprintf(_T("\tF9\tKill all tagged processes.\n"));
 				_tprintf(_T("\tF10, q\tQuit.\n"));
 				_tprintf(_T("\tI\tInvert the sort order.\n"));
@@ -1115,9 +1251,8 @@ int _tmain(int argc, TCHAR *argv[])
 			DWORD PID = i+ProcessIndex;
 			if(PID < ProcessCount) {
 				const process *Process = &ProcessList[PID];
-				SetupProcessColor(Process, PID == SelectedProcessIndex);
 				SetConCursorPos(0, (SHORT)(i + ProcessWindowPosY));
-				WriteProcessInfo(Process);
+				WriteProcessInfo(Process, PID == SelectedProcessIndex);
 				Count++;
 			}
 		}
@@ -1138,6 +1273,7 @@ int _tmain(int argc, TCHAR *argv[])
 				{_T("F5"), _T("MEM")},
 				{_T("F6"), _T("TIME")},
 				{_T("F7"), _T("EXEC")},
+				{_T("F8"), _T("TREE")},
 				{_T("F9"), _T("KILL")},
 				{_T("F10"), _T("QUIT")},
 			};
@@ -1171,6 +1307,7 @@ int _tmain(int argc, TCHAR *argv[])
 		/*
 		 * Input loop. Breaks after REDRAW_INTERVAL ms or if forced.
 		 */
+
 		while(1) {
 			/*
 			 * Whether or not to redraw the selected process
@@ -1248,6 +1385,9 @@ int _tmain(int argc, TCHAR *argv[])
 					InInputMode = TRUE;
 					_tcsncpy_s(InputModeStr, _countof(InputModeStr), _T("Command"), 8);
 					break;
+				} else if(GetAsyncKeyState(VK_F8)) {
+					NewProcessSortType = SORT_BY_TREE;
+					break;
 				} else if(GetAsyncKeyState(VK_F9)) {
 					if(TaggedProcessesCount != 0) {
 						EnterCriticalSection(&SyncLock);
@@ -1268,13 +1408,11 @@ int _tmain(int argc, TCHAR *argv[])
 
 				if(RedrawAtCursor) {
 					SetConCursorPos(0, (SHORT)(ProcessWindowPosY + SelectedProcessIndex - ProcessIndex));
-					SetupProcessColor(&ProcessList[SelectedProcessIndex], TRUE);
-					WriteProcessInfo(&ProcessList[SelectedProcessIndex]);
+					WriteProcessInfo(&ProcessList[SelectedProcessIndex], TRUE);
 
 					if(OldSelectedProcessIndex != SelectedProcessIndex) {
 						SetConCursorPos(0, (SHORT)(ProcessWindowPosY + OldSelectedProcessIndex - ProcessIndex));
-						SetupProcessColor(&ProcessList[OldSelectedProcessIndex], FALSE);
-						WriteProcessInfo(&ProcessList[OldSelectedProcessIndex]);
+						WriteProcessInfo(&ProcessList[OldSelectedProcessIndex], FALSE);
 					}
 				}
 

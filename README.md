@@ -32,6 +32,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | F5 								   | Sort list by memory usage.  |
 | F6 								   | Sort list by uptime.  |
 | F7 								   | Execute a command.  |
+| F8 								   | View process tree.  |
 | F9 								   | Kill all tagged processes.  |
 | F10, q 						       | Quit.  |
 | I 								   | Invert the sort order.  |
