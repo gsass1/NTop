@@ -52,7 +52,7 @@ For enabling Unicode support:
 ## TODO
 * Figure out buggy resizing.
 * Don't map all the function keys for sorting only. Rather let that be a distinctive menu like in htop.
-* View process tree.
+* ~~View process tree.~~
 * Searching.
 * Filtering.
 * All of htop's command line options.
