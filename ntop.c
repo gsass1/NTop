@@ -227,6 +227,8 @@ static DWORD RunningProcessCount = 0;
 static DWORD ProcessIndex = 0;
 static DWORD SelectedProcessIndex = 0;
 static DWORD SelectedProcessID = 0;
+static BOOL FollowProcess = FALSE;
+static DWORD FollowProcessID = 0;
 
 typedef enum sort_order {
 	ASCENDING,
@@ -471,6 +473,35 @@ static BOOL FilterByPID = FALSE;
 static DWORD PidFilterList[1024];
 static DWORD PidFilterCount;
 
+static void ReadjustCursor(void)
+{
+	if(FollowProcess) {
+		BOOL Found = FALSE;
+		for(DWORD i = 0; i < ProcessCount; i++) {
+			if(ProcessList[i].ID == FollowProcessID) {
+				SelectedProcessIndex = i;
+				if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
+					ProcessIndex = SelectedProcessIndex;
+				}
+				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
+					ProcessIndex = min(ProcessCount - VisibleProcessCount, SelectedProcessIndex);
+				}
+				Found = TRUE;
+				break;
+			}
+		}
+
+		if(!Found) {
+			/* Process got lost, might as well disable this now */
+			FollowProcess = FALSE;
+		}
+	} else {
+		/* After process list update ProcessIndex and SelectedProcessIndex may become out of range */
+		ProcessIndex = min(ProcessIndex, ProcessCount - VisibleProcessCount);
+		SelectedProcessIndex = min(SelectedProcessIndex, ProcessCount - 1);
+	}
+}
+
 static void PollProcessList(void)
 {
 	HANDLE Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, 0);
@@ -635,10 +666,7 @@ static void PollProcessList(void)
 	memcpy(&ProcessList, &NewProcessList, sizeof(process) * NewProcessCount);
 	ProcessCount = NewProcessCount;
 	SortProcessList();
-
-	/* After process list update ProcessIndex and SelectedProcessIndex may become out of range */
-	ProcessIndex = min(ProcessIndex, ProcessCount - VisibleProcessCount);
-	SelectedProcessIndex = min(SelectedProcessIndex, ProcessCount - 1);
+	ReadjustCursor();
 
 	LeaveCriticalSection(&SyncLock);
 }
@@ -1083,6 +1111,9 @@ int _tmain(int argc, TCHAR *argv[])
 				_tprintf(_T("\tF9\tKill all tagged processes.\n"));
 				_tprintf(_T("\tF10, q\tQuit.\n"));
 				_tprintf(_T("\tI\tInvert the sort order.\n"));
+				_tprintf(_T("\tF\tFollow process: if the sort order causes the currently selected\n"));
+				_tprintf(_T("\t\tprocess to move in the list, make the selection bar follow it.\n"));
+				_tprintf(_T("\t\tMoving the cursor manually automatically disables this feature.\n"));
 				return EXIT_SUCCESS;
 			case 's':
 				if(++i < argc) {
@@ -1363,6 +1394,11 @@ int _tmain(int argc, TCHAR *argv[])
 						KeyPress = FALSE;
 					}
 
+					if(KeyPress) {
+						/* When cursor moved we stop following any processes */
+						FollowProcess = FALSE;
+					}
+
 					if(Redraw) {
 						break;
 					}
@@ -1391,8 +1427,12 @@ int _tmain(int argc, TCHAR *argv[])
 					else
 						SortOrder = ASCENDING;
 					SortProcessList();
+					ReadjustCursor();
 					LeaveCriticalSection(&SyncLock);
 					break;
+				} else if(Shift && GetAsyncKeyState(0x46)) /* f */ {
+					FollowProcess = TRUE;
+					FollowProcessID = ProcessList[SelectedProcessIndex].ID;
 				} else if(GetAsyncKeyState(VK_SPACE) == -32767) {
 					ToggleTaggedProcess(ProcessList[SelectedProcessIndex].ID);
 					RedrawAtCursor = TRUE;
@@ -1507,6 +1547,7 @@ int _tmain(int argc, TCHAR *argv[])
 			EnterCriticalSection(&SyncLock);
 			ProcessSortType = NewProcessSortType;
 			SortProcessList();
+			ReadjustCursor();
 			LeaveCriticalSection(&SyncLock);
 		}
 	}
