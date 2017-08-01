@@ -637,7 +637,7 @@ static void PollProcessList(void)
 	SortProcessList();
 
 	/* After process list update ProcessIndex and SelectedProcessIndex may become out of range */
-	ProcessIndex = min(ProcessIndex, ProcessCount - VisibleProcessCount + 1);
+	ProcessIndex = min(ProcessIndex, ProcessCount - VisibleProcessCount);
 	SelectedProcessIndex = min(SelectedProcessIndex, ProcessCount - 1);
 
 	LeaveCriticalSection(&SyncLock);
@@ -950,7 +950,9 @@ static BOOL RedrawAtCursor = FALSE;
 
 typedef enum scroll_type {
 	SCROLL_UP,
-	SCROLL_DOWN
+	SCROLL_DOWN,
+	SCROLL_PAGE_UP,
+	SCROLL_PAGE_DOWN,
 } scroll_type;
 
 static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
@@ -993,6 +995,41 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 						*Redraw = TRUE;
 					}
 				}
+			}
+			break;
+		case SCROLL_PAGE_UP:
+			if(SelectedProcessIndex != 0) {
+				Scrolled = TRUE;
+				OldSelectedProcessIndex = SelectedProcessIndex;
+				if(SelectedProcessIndex > VisibleProcessCount)
+					SelectedProcessIndex -= VisibleProcessCount;
+				else
+					SelectedProcessIndex = 0;
+				if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
+					ProcessIndex = max(0, SelectedProcessIndex);
+					*Redraw = TRUE;
+				}
+			}
+			break;
+		case SCROLL_PAGE_DOWN:
+			if(SelectedProcessIndex != ProcessCount-1) {
+				Scrolled = TRUE;
+				OldSelectedProcessIndex = SelectedProcessIndex;
+				SelectedProcessIndex += VisibleProcessCount;
+				if(SelectedProcessIndex > ProcessCount - 1)
+					SelectedProcessIndex = ProcessCount - 1;
+				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
+					ProcessIndex = min(ProcessCount - VisibleProcessCount, SelectedProcessIndex);
+					*Redraw = TRUE;
+				}
+				/*
+				while(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
+					if(ProcessIndex <= ProcessCount - ProcessWindowHeight - 1) {
+						ProcessIndex++;
+						*Redraw = TRUE;
+					}
+				}
+				*/
 			}
 			break;
 		}
@@ -1322,10 +1359,14 @@ int _tmain(int argc, TCHAR *argv[])
 				if(GetTickCount64() - LastKeyPress >= SCROLL_INTERVAL) {
 					BOOL Redraw = FALSE;
 
-					if(GetAsyncKeyState(VK_UP) || GetAsyncKeyState(VK_PRIOR)) {
+					if(GetAsyncKeyState(VK_UP)) {
 						DoScroll(SCROLL_UP, &Redraw);
-					} else if(GetAsyncKeyState(VK_DOWN) || GetAsyncKeyState(VK_NEXT)) {
+					} else if(GetAsyncKeyState(VK_PRIOR)) {
+						DoScroll(SCROLL_PAGE_UP, &Redraw);
+					} else if(GetAsyncKeyState(VK_DOWN)) {
 						DoScroll(SCROLL_DOWN, &Redraw);
+					} else if(GetAsyncKeyState(VK_NEXT)) {
+						DoScroll(SCROLL_PAGE_DOWN, &Redraw);
 					} else {
 						KeyPress = FALSE;
 					}
