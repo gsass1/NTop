@@ -913,7 +913,7 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 
 		CharsWritten += _tprintf(_T("%s"), Process->ExeName);
 	} else {
-		CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s %s"),
+		CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
