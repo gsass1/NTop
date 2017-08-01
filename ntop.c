@@ -1022,14 +1022,6 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 					ProcessIndex = min(ProcessCount - VisibleProcessCount, SelectedProcessIndex);
 					*Redraw = TRUE;
 				}
-				/*
-				while(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
-					if(ProcessIndex <= ProcessCount - ProcessWindowHeight - 1) {
-						ProcessIndex++;
-						*Redraw = TRUE;
-					}
-				}
-				*/
 			}
 			break;
 		}
@@ -1376,8 +1368,10 @@ int _tmain(int argc, TCHAR *argv[])
 					}
 				}
 
+				BOOL Shift = GetAsyncKeyState(VK_SHIFT);
+
 				if(GetAsyncKeyState(0x47)) { /* g */
-					if(GetAsyncKeyState(VK_SHIFT)) {
+					if(Shift) {
 						SelectedProcessIndex = ProcessCount - 1;
 						ProcessIndex = SelectedProcessIndex - VisibleProcessCount + 1; 
 					} else {
@@ -1385,12 +1379,12 @@ int _tmain(int argc, TCHAR *argv[])
 						SelectedProcessIndex = 0;
 					}
 					break;
-				} else if(GetAsyncKeyState(VK_SHIFT) && GetAsyncKeyState(0x55)) /* u */ {
+				} else if(Shift && GetAsyncKeyState(0x55)) /* u */ {
 					if(TaggedProcessesCount != 0) {
 						TaggedProcessesCount = 0;
 						break;
 					}
-				} else if(GetAsyncKeyState(VK_SHIFT) && GetAsyncKeyState(0x49) == -32767) /* i */ {
+				} else if(Shift && GetAsyncKeyState(0x49) == -32767) /* i */ {
 					EnterCriticalSection(&SyncLock);
 					if(SortOrder == ASCENDING)
 						SortOrder = DESCENDING;
