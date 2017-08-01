@@ -250,9 +250,9 @@ static int SortProcessByID(const void *A, const void *B)
 static int SortProcessByExe(const void *A, const void *B)
 {
 	if(SortOrder == ASCENDING)
-		return _tcsncmp(((const process *)A)->ExeName, ((const process *)B)->ExeName, MAX_PATH);
+		return _tcsncicmp(((const process *)A)->ExeName, ((const process *)B)->ExeName, MAX_PATH);
 	else
-		return _tcsncmp(((const process *)B)->ExeName, ((const process *)A)->ExeName, MAX_PATH);
+		return _tcsncicmp(((const process *)B)->ExeName, ((const process *)A)->ExeName, MAX_PATH);
 }
 
 static int SortProcessByUserName(const void *A, const void *B)
