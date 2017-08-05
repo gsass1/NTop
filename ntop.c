@@ -165,6 +165,8 @@ static void ParseConfigLine(char *Line)
 	}
 }
 
+#define BUF_INCREASE 256
+
 static void ReadConfigFile(void)
 {
 	FILE *File;
@@ -174,11 +176,26 @@ static void ReadConfigFile(void)
 	if(Error != 0)
 		return;
 
-	char Buffer[256];
-	while(fgets(Buffer, _countof(Buffer), File)) {
-		ParseConfigLine(Buffer);
+	size_t BufferSize = BUF_INCREASE;
+	size_t Offset = 0;
+	char *Buffer = xmalloc(BUF_INCREASE);
+
+	while(1) {
+		if(!fgets(Offset + Buffer, BufferSize - Offset, File)) {
+			break;
+		}
+
+		if(!feof(File) && !strchr(Buffer, '\n')) {
+			Offset = BufferSize - 1;
+			BufferSize += BUF_INCREASE;
+			Buffer = xrealloc(Buffer, BufferSize);
+		} else {
+			Offset = 0;
+			ParseConfigLine(Buffer);
+		}
 	}
 
+	free(Buffer);
 	fclose(File);
 }
 
