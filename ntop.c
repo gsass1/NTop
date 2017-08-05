@@ -1437,8 +1437,8 @@ int _tmain(int argc, TCHAR *argv[])
 			RedrawAtCursor = FALSE;
 
 			if(!InInputMode) {
+				BOOL Redraw = FALSE;
 				if(GetTickCount64() - LastKeyPress >= SCROLL_INTERVAL) {
-					BOOL Redraw = FALSE;
 
 					if(GetAsyncKeyState(VK_UP)) {
 						DoScroll(SCROLL_UP, &Redraw);
@@ -1495,6 +1495,10 @@ int _tmain(int argc, TCHAR *argv[])
 					ToggleTaggedProcess(ProcessList[SelectedProcessIndex].ID);
 					RedrawAtCursor = TRUE;
 					OldSelectedProcessIndex = SelectedProcessIndex;
+					DoScroll(SCROLL_DOWN, &Redraw);
+					if(Redraw) {
+						break;
+					}
 				} else if(GetAsyncKeyState(VK_F1)) {
 					NewProcessSortType = SORT_BY_ID;
 					break;
