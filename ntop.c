@@ -604,10 +604,7 @@ static void PollProcessList(void)
 						TCHAR DomainName[MAX_PATH];
 						DWORD DomainLength = MAX_PATH;
 
-						if(!LookupAccountSid(NULL, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse)) {
-							DWORD Error = GetLastError();
-							DebugBreak();
-						}
+						LookupAccountSid(NULL, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse);
 					}
 					free(TokenUserStruct);
 				}
