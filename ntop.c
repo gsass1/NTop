@@ -66,6 +66,27 @@ static NORETURN void Die(TCHAR *Fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
+static void *xmalloc(size_t size)
+{
+	void *m = malloc(size);
+
+	if(!m)
+		Die("malloc");
+
+	return m;
+}
+
+static void *xrealloc(void *ptr, size_t size)
+{
+	void *m = realloc(ptr, size);
+
+	if(!m)
+		Die("realloc");
+
+	return m;
+}
+
+
 #define FOREGROUND_WHITE (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
 #define FOREGROUND_CYAN (FOREGROUND_INTENSITY | FOREGROUND_GREEN | FOREGROUND_BLUE)
 #define BACKGROUND_WHITE (BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE)
@@ -189,34 +210,47 @@ typedef struct process {
 	DWORD TreeDepth;
 } process;
 
-/*
- * 1024 entries ought to be enough for anybody. - Bill Gates
- * TODO: Dynamically allocate theses lists
- */
-static process ProcessList[1024];
-static process NewProcessList[1024];
-static DWORD TaggedProcesses[1024];
-static DWORD TaggedProcessesCount;
+#define PROCLIST_BUF_INCREASE 64
+
+static process *ProcessList;
+static process *NewProcessList;
+static DWORD ProcessListSize = PROCLIST_BUF_INCREASE;
+
+static DWORD *TaggedProcessList;
+static DWORD TaggedProcessListCount;
+static DWORD TaggedProcessListSize = PROCLIST_BUF_INCREASE;
+
+static void IncreaseProcListSize(void)
+{
+	ProcessListSize += PROCLIST_BUF_INCREASE;
+	NewProcessList = xrealloc(NewProcessList, ProcessListSize * sizeof *NewProcessList);
+	ProcessList = xrealloc(ProcessList, ProcessListSize * sizeof *ProcessList);
+}
 
 static void ToggleTaggedProcess(DWORD ID)
 {
-	for(DWORD i = 0; i < TaggedProcessesCount; i++) {
-		if(TaggedProcesses[i] == ID) {
-			for(; i < TaggedProcessesCount-1;i++) {
-				TaggedProcesses[i] = TaggedProcesses[i+1];
+	for(DWORD i = 0; i < TaggedProcessListCount; i++) {
+		if(TaggedProcessList[i] == ID) {
+			for(; i < TaggedProcessListCount-1;i++) {
+				TaggedProcessList[i] = TaggedProcessList[i+1];
 			}
-			TaggedProcessesCount--;
+			TaggedProcessListCount--;
 			return;
 		}
 	}
 
-	TaggedProcesses[TaggedProcessesCount++] = ID;
+	TaggedProcessList[TaggedProcessListCount++] = ID;
+
+	if(TaggedProcessListCount >= TaggedProcessListSize) {
+		TaggedProcessListSize += PROCLIST_BUF_INCREASE;
+		TaggedProcessList = xrealloc(TaggedProcessList, PROCLIST_BUF_INCREASE * sizeof *TaggedProcessList);
+	}
 }
 
 static BOOL IsProcessTagged(DWORD ID)
 {
-	for(DWORD i = 0; i < TaggedProcessesCount; i++) {
-		if(TaggedProcesses[i] == ID)
+	for(DWORD i = 0; i < TaggedProcessListCount; i++) {
+		if(TaggedProcessList[i] == ID)
 			return TRUE;
 	}
 	return FALSE;
@@ -413,12 +447,13 @@ static void SortProcessList(void)
 					/* Process group is already right where we want it to be */
 					goto Next;
 
-				/* Move all processes */
 
-				/*
-				 * TODO: This will cease to work if we start dynamically allocating the process list
-				 * because then we have to allocate another buffer in which to store the extra processes.
-				 */
+				/* Make sure process list size has enough left-over to move the data to */
+				while(ProcessCount+Size > ProcessListSize) {
+					IncreaseProcListSize();
+				}
+
+				/* Move all processes */
 				for(DWORD j = ProcessCount+Size-1; j >= TmpLoc && j != 0; j--) {
 					ProcessList[j] = ProcessList[j-Size];
 				}
@@ -543,22 +578,23 @@ static void PollProcessList(void)
 				DWORD ReturnLength;
 
 				GetTokenInformation(ProcessTokenHandle, TokenUser, NULL, 0, &ReturnLength);
-				assert(GetLastError() == ERROR_INSUFFICIENT_BUFFER);
-				PTOKEN_USER TokenUserStruct = malloc(ReturnLength);
+				if(GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+					PTOKEN_USER TokenUserStruct = xmalloc(ReturnLength);
 
-				if(GetTokenInformation(ProcessTokenHandle, TokenUser, TokenUserStruct, ReturnLength, &ReturnLength)) {
-					SID_NAME_USE NameUse;
-					DWORD NameLength = UNLEN;
-					TCHAR DomainName[MAX_PATH];
-					DWORD DomainLength = MAX_PATH;
+					if(GetTokenInformation(ProcessTokenHandle, TokenUser, TokenUserStruct, ReturnLength, &ReturnLength)) {
+						SID_NAME_USE NameUse;
+						DWORD NameLength = UNLEN;
+						TCHAR DomainName[MAX_PATH];
+						DWORD DomainLength = MAX_PATH;
 
-					if(!LookupAccountSid(NULL, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse)) {
-						DWORD Error = GetLastError();
-						DebugBreak();
+						if(!LookupAccountSid(NULL, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse)) {
+							DWORD Error = GetLastError();
+							DebugBreak();
+						}
 					}
+					free(TokenUserStruct);
 				}
 				CloseHandle(ProcessTokenHandle);
-				free(TokenUserStruct);
 			}
 		}
 
@@ -580,6 +616,10 @@ static void PollProcessList(void)
 		}
 
 		NewProcessList[i++] = Process;
+
+		if(i >= ProcessListSize) {
+			IncreaseProcListSize();
+		}
 	}
 
 	CloseHandle(Snapshot);
@@ -600,7 +640,7 @@ static void PollProcessList(void)
 		FILETIME CreationTime, ExitTime, KernelTime, UserTime; 
 	} process_times;
 
-	process_times *ProcessTimes = (process_times *)malloc(NewProcessCount * sizeof(*ProcessTimes));
+	process_times *ProcessTimes = (process_times *)xmalloc(NewProcessCount * sizeof(*ProcessTimes));
 
 	for(DWORD i = 0; i < NewProcessCount; i++) {
 		const process *Process = &NewProcessList[i];
@@ -663,7 +703,7 @@ static void PollProcessList(void)
 
 	EnterCriticalSection(&SyncLock);
 
-	memcpy(&ProcessList, &NewProcessList, sizeof(process) * NewProcessCount);
+	memcpy(ProcessList, NewProcessList, NewProcessCount * sizeof *ProcessList);
 	ProcessCount = NewProcessCount;
 	SortProcessList();
 	ReadjustCursor();
@@ -1182,6 +1222,10 @@ int _tmain(int argc, TCHAR *argv[])
 		ReadConfigFile();
 	}
 
+	ProcessList = xmalloc(ProcessListSize * sizeof *ProcessList);
+	NewProcessList = xmalloc(ProcessListSize * sizeof *ProcessList);
+	TaggedProcessList = xmalloc(TaggedProcessListSize * sizeof *TaggedProcessList);
+
 	PollConsoleInfo();
 	PollInitialSystemInfo();
 	PollSystemInfo();
@@ -1416,8 +1460,8 @@ int _tmain(int argc, TCHAR *argv[])
 					}
 					break;
 				} else if(Shift && GetAsyncKeyState(0x55)) /* u */ {
-					if(TaggedProcessesCount != 0) {
-						TaggedProcessesCount = 0;
+					if(TaggedProcessListCount != 0) {
+						TaggedProcessListCount = 0;
 						break;
 					}
 				} else if(Shift && GetAsyncKeyState(0x49) == -32767) /* i */ {
@@ -1464,17 +1508,17 @@ int _tmain(int argc, TCHAR *argv[])
 					NewProcessSortType = SORT_BY_TREE;
 					break;
 				} else if(GetAsyncKeyState(VK_F9)) {
-					if(TaggedProcessesCount != 0) {
+					if(TaggedProcessListCount != 0) {
 						EnterCriticalSection(&SyncLock);
-						for(DWORD i = 0; i < TaggedProcessesCount; i++) {
-							DWORD PID = TaggedProcesses[i];
+						for(DWORD i = 0; i < TaggedProcessListCount; i++) {
+							DWORD PID = TaggedProcessList[i];
 							HANDLE Handle = OpenProcess(PROCESS_TERMINATE, FALSE, PID);
 							if(Handle) {
 								TerminateProcess(Handle, 9);
 								CloseHandle(Handle);
 							}
 						}
-						TaggedProcessesCount = 0;
+						TaggedProcessListCount = 0;
 						LeaveCriticalSection(&SyncLock);
 					}
 				} else if(GetAsyncKeyState(VK_F10) || GetAsyncKeyState(0x51)) /* q */ {
