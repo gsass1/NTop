@@ -51,10 +51,9 @@ For enabling Unicode support:
 `cmake -DENABLE_UNICODE=ON .`
 
 ## TODO
-* Figure out buggy resizing.
-* Don't map all the function keys for sorting only. Rather let that be a distinctive menu like in htop.
+* ~~Figure out buggy resizing.~~
 * ~~View process tree.~~
 * Searching.
 * Filtering.
 * All of htop's command line options.
-* At least the most important interactive commands (e.g. following processes).
+* At least the most important interactive commands (e.g. ~~following processes~~).
