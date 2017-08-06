@@ -108,7 +108,6 @@ static void *xrealloc(void *ptr, size_t size)
 	return m;
 }
 
-
 #define FOREGROUND_WHITE (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
 #define FOREGROUND_CYAN (FOREGROUND_INTENSITY | FOREGROUND_GREEN | FOREGROUND_BLUE)
 #define BACKGROUND_WHITE (BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE)
@@ -1442,7 +1441,6 @@ int _tmain(int argc, TCHAR *argv[])
 		} else {
 			SetColor(Config.BGHighlightColor);
 			CharsWritten = ConPrintf(_T("\n%s: %s_"), InputModeStr, Input);
-
 
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
