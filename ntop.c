@@ -41,6 +41,7 @@ static DWORD ProcessWindowHeight;
 static DWORD VisibleProcessCount;
 static WORD SavedAttributes;
 static HANDLE ConsoleHandle;
+static HANDLE OldConsoleHandle;
 static CRITICAL_SECTION SyncLock;
 
 #ifdef _MSC_VER
@@ -64,6 +65,27 @@ static NORETURN void Die(TCHAR *Fmt, ...)
 	WriteFile(GetStdHandle(STD_ERROR_HANDLE), Buffer, sizeof(*Buffer) * (_tcslen(Buffer) + 1), NULL, NULL);
 
 	exit(EXIT_FAILURE);
+}
+
+static int ConPrintf(TCHAR *Fmt, ...)
+{
+	TCHAR Buffer[1024];
+	va_list VaList;
+
+	va_start(VaList, Fmt);
+	int CharsWritten = _vstprintf_s(Buffer, _countof(Buffer), Fmt, VaList);
+	va_end(VaList);
+
+	DWORD Dummy;
+	WriteConsole(ConsoleHandle, Buffer, CharsWritten, &Dummy, NULL);
+
+	return CharsWritten;
+}
+
+static void ConPutc(char c)
+{
+	DWORD Dummy;
+	WriteConsole(ConsoleHandle, &c, 1, &Dummy, NULL);
 }
 
 static void *xmalloc(size_t size)
@@ -856,7 +878,7 @@ static void FormatTimeString(TCHAR *Buffer, ULONGLONG MS)
 
 static void WriteBlankLine(void)
 {
-	_tprintf(_T("%*c"), Width, ' ');
+	ConPrintf(_T("%*c"), Width, ' ');
 }
 
 static BOOL WINAPI CtrlHandler(DWORD signal)
@@ -879,11 +901,11 @@ static void DrawProcessListHeader(const process_list_column *Columns, int Count)
 		} else {
 			SetColor(Config.ProcessListHeaderColor);
 		}
-		CharsWritten += _tprintf(_T("%*s  "), Columns[i].Width, Columns[i].Name);
+		CharsWritten += ConPrintf(_T("%*s  "), Columns[i].Width, Columns[i].Name);
 	}
 
 	for(; CharsWritten < Width; CharsWritten++) {
-		putchar(' ');
+		ConPutc(' ');
 	}
 }
 
@@ -897,13 +919,13 @@ static void DrawOptions(const options_column *Columns, int Count)
 	int CharsWritten = 0;
 	for(int i = 0; i < Count; i++) {
 		SetColor(Config.FGColor);
-		CharsWritten += _tprintf(_T("%s"), Columns[i].Key);
+		CharsWritten += ConPrintf(_T("%s"), Columns[i].Key);
 		SetColor(Config.BGHighlightColor);
-		CharsWritten += _tprintf(_T("%-4s"), Columns[i].Name);
+		CharsWritten += ConPrintf(_T("%-4s"), Columns[i].Name);
 	}
 
 	for(; CharsWritten < Width-1; CharsWritten++) {
-		putchar(' ');
+		ConPutc(' ');
 	}
 }
 
@@ -914,37 +936,33 @@ static int DrawPercentageBar(TCHAR *Name, double Percentage, WORD Color)
 	int CharsWritten = 0;
 
 	SetColor(Config.FGHighlightColor);
-	CharsWritten += _tprintf(_T("  %s"), Name);
+	CharsWritten += ConPrintf(_T("  %s"), Name);
 	SetColor(Config.FGColor);
-	putchar('[');
+	ConPutc('[');
 	CharsWritten++;
 
 	int Bars = (int)((double)BAR_WIDTH * Percentage);
 	SetColor(Color);
 	for(int i = 0; i < Bars; i++) {
-		putchar('|');
+		ConPutc('|');
 	}
 	CharsWritten+= Bars;
 	SetColor(Config.FGColor);
 	for(int i = 0; i < BAR_WIDTH - Bars; i++) {
-		putchar(' ');
+		ConPutc(' ');
 	}
 	CharsWritten += BAR_WIDTH - Bars;
 	SetColor(Config.BGColor);
-	CharsWritten += _tprintf(_T("%04.1f%%"), 100.0 * Percentage);
+	CharsWritten += ConPrintf(_T("%04.1f%%"), 100.0 * Percentage);
 	SetColor(Config.FGColor);
-	putchar(']');
+	ConPutc(']');
 	CharsWritten++;
 	return CharsWritten;
 }
 
 static void RestoreConsole(void)
 {
-	SetColor(SavedAttributes);
-	CONSOLE_CURSOR_INFO CursorInfo;
-	GetConsoleCursorInfo(ConsoleHandle, &CursorInfo);
-	CursorInfo.bVisible = TRUE;
-	SetConsoleCursorInfo(ConsoleHandle, &CursorInfo);
+	SetConsoleActiveScreenBuffer(OldConsoleHandle);
 }
 
 static void WriteProcessInfo(const process *Process, BOOL Highlighted)
@@ -975,7 +993,7 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 			_tcscat_s(OffsetStr, _countof(OffsetStr), _T("`- "));
 		}
 
-		CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s"),
+		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
@@ -990,12 +1008,12 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 			SetColor(Config.FGHighlightColor);
 		}
 
-		CharsWritten += _tprintf(_T("  %s"), OffsetStr);
+		CharsWritten += ConPrintf(_T("  %s"), OffsetStr);
 		SetColor(Color);
 
-		CharsWritten += _tprintf(_T("%s"), Process->ExeName);
+		CharsWritten += ConPrintf(_T("%s"), Process->ExeName);
 	} else {
-		CharsWritten = _tprintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s  %s"),
+		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
@@ -1008,7 +1026,7 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 	}
 
 
-	_tprintf(_T("%*c"), Width-CharsWritten+1, ' ');
+	ConPrintf(_T("%*c"), Width-CharsWritten+1, ' ');
 }
 
 static void ExecCommand(TCHAR *Command)
@@ -1117,15 +1135,15 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 
 static void PrintVersion(void)
 {
-	_tprintf(_T("NTop " NTOP_VER " - (C) 2017 Gian Sass\n"));
-	_tprintf(_T("Compiled on " __DATE__ " " __TIME__ "\n"));
+	ConPrintf(_T("NTop " NTOP_VER " - (C) 2017 Gian Sass\n"));
+	ConPrintf(_T("Compiled on " __DATE__ " " __TIME__ "\n"));
 
 #ifdef _UNICODE
 	TCHAR UnicodeEnabled[] = _T("Yes");
 #else
 	TCHAR UnicodeEnabled[] = _T("No");
 #endif
-	_tprintf(_T("Unicode version: %s\n\n"), UnicodeEnabled);
+	ConPrintf(_T("Unicode version: %s\n\n"), UnicodeEnabled);
 }
 
 int _tmain(int argc, TCHAR *argv[])
@@ -1140,34 +1158,34 @@ int _tmain(int argc, TCHAR *argv[])
 				break;
 			case 'h':
 				PrintVersion();
-				_tprintf(_T("Usage: %s [OPTIONS]\n\n"), argv[0]);
-				_tprintf(_T("Options:\n"));
-				_tprintf(_T("\t-C\tUse a monochrome color scheme\n"));
-				_tprintf(_T("\t-h\tDisplay this\n"));
-				_tprintf(_T("\t-p PID,PID...\n\t\tShow only the given PIDs\n"));
-				_tprintf(_T("\t-s COLUMN\n\t\tSort by this column\n"));
-				_tprintf(_T("\t-u USERNAME\n\t\tDisplay only the processes of this user\n"));
-				_tprintf(_T("\t-v\tPrint version\n"));
-				_tprintf(_T("\nInteractive commands:\n"));
-				_tprintf(_T("\tUp and Down Arrows, PgUp and PgDown\n\t\tScroll through the process list.\n"));
-				_tprintf(_T("\tg\tGo to the top of the list.\n"));
-				_tprintf(_T("\tG\tGo to the bottom of the list.\n"));
-				_tprintf(_T("\tSpace\tTag or untag selected process.\n"));
-				_tprintf(_T("\tU\tUntag all tagged processes.\n"));
-				_tprintf(_T("\tF1\tSort list by ID.\n"));
-				_tprintf(_T("\tF2\tSort list by executable name.\n"));
-				_tprintf(_T("\tF3\tSort list by user name.\n"));
-				_tprintf(_T("\tF4\tSort list by CPU usage.\n"));
-				_tprintf(_T("\tF5\tSort list by memory usage.\n"));
-				_tprintf(_T("\tF6\tSort list by uptime.\n"));
-				_tprintf(_T("\tF7\tExecute a command.\n"));
-				_tprintf(_T("\tF8\tView process tree.\n"));
-				_tprintf(_T("\tF9\tKill all tagged processes.\n"));
-				_tprintf(_T("\tF10, q\tQuit.\n"));
-				_tprintf(_T("\tI\tInvert the sort order.\n"));
-				_tprintf(_T("\tF\tFollow process: if the sort order causes the currently selected\n"));
-				_tprintf(_T("\t\tprocess to move in the list, make the selection bar follow it.\n"));
-				_tprintf(_T("\t\tMoving the cursor manually automatically disables this feature.\n"));
+				ConPrintf(_T("Usage: %s [OPTIONS]\n\n"), argv[0]);
+				ConPrintf(_T("Options:\n"));
+				ConPrintf(_T("\t-C\tUse a monochrome color scheme\n"));
+				ConPrintf(_T("\t-h\tDisplay this\n"));
+				ConPrintf(_T("\t-p PID,PID...\n\t\tShow only the given PIDs\n"));
+				ConPrintf(_T("\t-s COLUMN\n\t\tSort by this column\n"));
+				ConPrintf(_T("\t-u USERNAME\n\t\tDisplay only the processes of this user\n"));
+				ConPrintf(_T("\t-v\tPrint version\n"));
+				ConPrintf(_T("\nInteractive commands:\n"));
+				ConPrintf(_T("\tUp and Down Arrows, PgUp and PgDown\n\t\tScroll through the process list.\n"));
+				ConPrintf(_T("\tg\tGo to the top of the list.\n"));
+				ConPrintf(_T("\tG\tGo to the bottom of the list.\n"));
+				ConPrintf(_T("\tSpace\tTag or untag selected process.\n"));
+				ConPrintf(_T("\tU\tUntag all tagged processes.\n"));
+				ConPrintf(_T("\tF1\tSort list by ID.\n"));
+				ConPrintf(_T("\tF2\tSort list by executable name.\n"));
+				ConPrintf(_T("\tF3\tSort list by user name.\n"));
+				ConPrintf(_T("\tF4\tSort list by CPU usage.\n"));
+				ConPrintf(_T("\tF5\tSort list by memory usage.\n"));
+				ConPrintf(_T("\tF6\tSort list by uptime.\n"));
+				ConPrintf(_T("\tF7\tExecute a command.\n"));
+				ConPrintf(_T("\tF8\tView process tree.\n"));
+				ConPrintf(_T("\tF9\tKill all tagged processes.\n"));
+				ConPrintf(_T("\tF10, q\tQuit.\n"));
+				ConPrintf(_T("\tI\tInvert the sort order.\n"));
+				ConPrintf(_T("\tF\tFollow process: if the sort order causes the currently selected\n"));
+				ConPrintf(_T("\t\tprocess to move in the list, make the selection bar follow it.\n"));
+				ConPrintf(_T("\t\tMoving the cursor manually automatically disables this feature.\n"));
 				return EXIT_SUCCESS;
 			case 's':
 				if(++i < argc) {
@@ -1188,7 +1206,7 @@ int _tmain(int argc, TCHAR *argv[])
 					} else if(!lstrcmpi(argv[i], _T("EXE"))) {
 						ProcessSortType = SORT_BY_EXE;
 					} else {
-						_tprintf(_T("Unknown column: '%s'\n"), argv[i]);
+						ConPrintf(_T("Unknown column: '%s'\n"), argv[i]);
 						return EXIT_FAILURE;
 					}
 				}
@@ -1218,7 +1236,7 @@ int _tmain(int argc, TCHAR *argv[])
 				}
 				break;
 			default:
-				_tprintf(_T("Unknown option: '%c'"), argv[i][1]);
+				ConPrintf(_T("Unknown option: '%c'"), argv[i][1]);
 				return EXIT_FAILURE;
 			}
 		}
@@ -1226,7 +1244,21 @@ int _tmain(int argc, TCHAR *argv[])
 
 	InitializeCriticalSection(&SyncLock);
 	SetConsoleCtrlHandler(CtrlHandler, TRUE);
-	ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+	OldConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	ConsoleHandle = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
+						  FILE_SHARE_READ|FILE_SHARE_WRITE,
+						  NULL,
+						  CONSOLE_TEXTMODE_BUFFER,
+						  NULL);
+
+	if(ConsoleHandle == INVALID_HANDLE_VALUE) {
+		Die("Could not create console screen buffer: %ld\n", GetLastError());
+	}
+
+	if(!SetConsoleActiveScreenBuffer(ConsoleHandle)) {
+		Die("Could not set active console screen buffer: %ld\n", GetLastError());
+	}
 
 	atexit(RestoreConsole);
 
@@ -1265,13 +1297,13 @@ int _tmain(int argc, TCHAR *argv[])
 
 		int MenuBarOffsetX = Width / 2 - (int)_tcslen(MenuBar) / 2;
 		for(int i = 0; i < MenuBarOffsetX; i++) {
-			putchar(' ');
+			ConPutc(' ');
 		}
 
-		_tprintf(_T("%s"), MenuBar);
+		ConPrintf(_T("%s"), MenuBar);
 
 		for(int i = 0; i < Width - MenuBarOffsetX - (int)_tcslen(MenuBar); i++) {
-			putchar(' ');
+			ConPutc(' ');
 		}
 
 		SetColor(Config.FGColor);
@@ -1300,47 +1332,47 @@ int _tmain(int argc, TCHAR *argv[])
 
 		if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) {
 			SetColor(Config.FGHighlightColor);
-			_tprintf(_T("%s"), CPUNameBuf);
+			ConPrintf(_T("%s"), CPUNameBuf);
 			SetColor(Config.FGColor);
-			_tprintf(_T("%s"), CPUInfoBuf);
+			ConPrintf(_T("%s"), CPUInfoBuf);
 			CharsWritten += CPUInfoChars;
 		}
 
 		SetColor(Config.FGHighlightColor);
-		_tprintf(_T("%s"), TasksNameBuf);
+		ConPrintf(_T("%s"), TasksNameBuf);
 		SetColor(Config.FGColor);
-		_tprintf(_T("%s"), TasksInfoBuf);
+		ConPrintf(_T("%s"), TasksInfoBuf);
 		CharsWritten += TaskInfoChars;
 
 		for(; CharsWritten < Width; CharsWritten++) {
-			putchar(' ');
+			ConPutc(' ');
 		}
 
 		/* Memory */
 		CharsWritten = DrawPercentageBar(_T("Mem"), UsedMemoryPerc, Config.MemoryBarColor);
 
 		SetColor(Config.FGHighlightColor);
-		CharsWritten += _tprintf(_T("  Size: "));
+		CharsWritten += ConPrintf(_T("  Size: "));
 		SetColor(Config.FGColor);
-		CharsWritten += _tprintf(_T("%d GB"), (int)TotalMemory/1000);
+		CharsWritten += ConPrintf(_T("%d GB"), (int)TotalMemory/1000);
 
 		for(; CharsWritten < Width; CharsWritten++) {
-			putchar(' ');
+			ConPutc(' ');
 		}
 
 		CharsWritten = DrawPercentageBar(_T("Pge"), UsedPageMemoryPerc, Config.PageMemoryBarColor);
 
 		SetColor(Config.FGHighlightColor);
-		CharsWritten += _tprintf(_T("  Uptime: "));
+		CharsWritten += ConPrintf(_T("  Uptime: "));
 
 		TCHAR Buffer[TIME_STR_SIZE];
 		FormatTimeString(Buffer, UpTime);
 		SetColor(Config.FGColor);
-		CharsWritten +=	_tprintf(_T("%s"), Buffer);
+		CharsWritten +=	ConPrintf(_T("%s"), Buffer);
 		SetColor(Config.FGColor);
 
 		for(; CharsWritten < Width; CharsWritten++) {
-			putchar(' ');
+			ConPutc(' ');
 		}
 
 		WriteBlankLine();
@@ -1396,13 +1428,13 @@ int _tmain(int argc, TCHAR *argv[])
 				{_T("F10"), _T("QUIT")},
 			};
 
-			putchar('\n');
+			ConPutc('\n');
 			DrawOptions(OptionColumns, _countof(OptionColumns));
 		} else {
 			SetColor(Config.BGHighlightColor);
-			CharsWritten = _tprintf(_T("\n%s: %s_"), InputModeStr, Input);
+			CharsWritten = ConPrintf(_T("\n%s: %s_"), InputModeStr, Input);
 			for(; CharsWritten < Width; CharsWritten++) {
-				putchar(' ');
+				ConPutc(' ');
 			}
 		}
 
