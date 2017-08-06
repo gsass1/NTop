@@ -1145,6 +1145,76 @@ static void PrintVersion(void)
 	ConPrintf(_T("Unicode version: %s\n\n"), UnicodeEnabled);
 }
 
+typedef struct help_entry {
+	TCHAR *Key;
+	TCHAR *Explanation;
+} help_entry;
+
+static void PrintHelp(const TCHAR *argv0)
+{
+	PrintVersion();
+
+	SetColor(0xE);
+	ConPrintf(_T("USAGE\n"));
+
+	SetColor(FOREGROUND_WHITE);
+	ConPrintf(_T("\t%s [OPTIONS]\n\n"), argv0);
+
+	static help_entry Options[] = {
+		{ _T("-C"), _T("Use a monochrome color scheme.") },
+		{ _T("-h"), _T("Display this help info.") },
+		{ _T("-p PID,PID...\n"), _T("\tShow only the given PIDs.") },
+		{ _T("-s COLUMN\n"), _T("\tShow only the given PIDs.") },
+		{ _T("-u USERNAME\n"), _T("\tDisplay only processes of this user.") },
+		{ _T("-v"), _T("Print version.") },
+	};
+
+	SetColor(0xE);
+	ConPrintf(_T("OPTIONS\n"));
+
+	for(int i = 0; i < _countof(Options); i++) {
+		help_entry Entry = Options[i];
+		SetColor(FOREGROUND_CYAN);
+		ConPrintf(_T("\t%s"), Entry.Key);
+		SetColor(FOREGROUND_WHITE);
+		ConPrintf(_T("\t%s\n"), Entry.Explanation);
+	}
+
+	SetColor(0xE);
+	ConPrintf(_T("\nINTERACTIVE COMMANDS\n"));
+
+	static help_entry InteractiveCommands[] = {
+		{ _T("Up and Down Arrows, PgUp and PgDown\n"), _T("\tScroll through the process list.") },
+		{ _T("g"), _T("Go to the top of the process list.") },
+		{ _T("G"), _T("Go to the bottom of the process list.") },
+		{ _T("Space"), _T("Tag or untag selected process.") },
+		{ _T("U"), _T("Untag all slected processes.") },
+		{ _T("F1"), _T("Sort list by ID.") },
+		{ _T("F2"), _T("Sort list by executable name.") },
+		{ _T("F3"), _T("Sort list by user name.") },
+		{ _T("F4"), _T("Sort list by CPU usage.") },
+		{ _T("F5"), _T("Sort list by memory usage.") },
+		{ _T("F6"), _T("Sort list by uptime.") },
+		{ _T("F7"), _T("Execute a command.") },
+		{ _T("F8"), _T("View process tree.") },
+		{ _T("F9"), _T("Kill all tagged processes.") },
+		{ _T("F10, q"), _T("Quit.") },
+		{ _T("I"), _T("Invert the sort order.") },
+		{ _T("F"), _T("Follow process: if the sort order causes the currently selected\n"
+			      "\t\tprocess to move in the list, make the selection bar follow it.\n"
+			      "\t\tMoving the cursor manually automatically disables this feature."
+				) },
+	};
+
+	for(int i = 0; i < _countof(InteractiveCommands); i++) {
+		help_entry Entry = InteractiveCommands[i];
+		SetColor(FOREGROUND_CYAN);
+		ConPrintf(_T("\t%s"), Entry.Key);
+		SetColor(FOREGROUND_WHITE);
+		ConPrintf(_T("\t%s\n"), Entry.Explanation);
+	}
+}
+
 int _tmain(int argc, TCHAR *argv[])
 {
 	BOOL Monochrome = FALSE;
@@ -1159,35 +1229,7 @@ int _tmain(int argc, TCHAR *argv[])
 				Monochrome = TRUE;
 				break;
 			case 'h':
-				PrintVersion();
-				ConPrintf(_T("Usage: %s [OPTIONS]\n\n"), argv[0]);
-				ConPrintf(_T("Options:\n"));
-				ConPrintf(_T("\t-C\tUse a monochrome color scheme\n"));
-				ConPrintf(_T("\t-h\tDisplay this\n"));
-				ConPrintf(_T("\t-p PID,PID...\n\t\tShow only the given PIDs\n"));
-				ConPrintf(_T("\t-s COLUMN\n\t\tSort by this column\n"));
-				ConPrintf(_T("\t-u USERNAME\n\t\tDisplay only the processes of this user\n"));
-				ConPrintf(_T("\t-v\tPrint version\n"));
-				ConPrintf(_T("\nInteractive commands:\n"));
-				ConPrintf(_T("\tUp and Down Arrows, PgUp and PgDown\n\t\tScroll through the process list.\n"));
-				ConPrintf(_T("\tg\tGo to the top of the list.\n"));
-				ConPrintf(_T("\tG\tGo to the bottom of the list.\n"));
-				ConPrintf(_T("\tSpace\tTag or untag selected process.\n"));
-				ConPrintf(_T("\tU\tUntag all tagged processes.\n"));
-				ConPrintf(_T("\tF1\tSort list by ID.\n"));
-				ConPrintf(_T("\tF2\tSort list by executable name.\n"));
-				ConPrintf(_T("\tF3\tSort list by user name.\n"));
-				ConPrintf(_T("\tF4\tSort list by CPU usage.\n"));
-				ConPrintf(_T("\tF5\tSort list by memory usage.\n"));
-				ConPrintf(_T("\tF6\tSort list by uptime.\n"));
-				ConPrintf(_T("\tF7\tExecute a command.\n"));
-				ConPrintf(_T("\tF8\tView process tree.\n"));
-				ConPrintf(_T("\tF9\tKill all tagged processes.\n"));
-				ConPrintf(_T("\tF10, q\tQuit.\n"));
-				ConPrintf(_T("\tI\tInvert the sort order.\n"));
-				ConPrintf(_T("\tF\tFollow process: if the sort order causes the currently selected\n"));
-				ConPrintf(_T("\t\tprocess to move in the list, make the selection bar follow it.\n"));
-				ConPrintf(_T("\t\tMoving the cursor manually automatically disables this feature.\n"));
+				PrintHelp(argv[0]);
 				return EXIT_SUCCESS;
 			case 's':
 				if(++i < argc) {
