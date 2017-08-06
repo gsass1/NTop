@@ -1150,6 +1150,9 @@ int _tmain(int argc, TCHAR *argv[])
 {
 	BOOL Monochrome = FALSE;
 
+	/* Only set this temporarily for command-line processing */
+	ConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
 	for(int i = 1; i < argc; i++) {
 		if(argv[i][0] == _T('-') && _tcslen(argv[i]) == 2) {
 			switch(argv[i][1]) {
@@ -1244,10 +1247,10 @@ int _tmain(int argc, TCHAR *argv[])
 
 	InitializeCriticalSection(&SyncLock);
 	SetConsoleCtrlHandler(CtrlHandler, TRUE);
-	OldConsoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+	OldConsoleHandle = ConsoleHandle;
 
 	ConsoleHandle = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
-						  FILE_SHARE_READ|FILE_SHARE_WRITE,
+						   FILE_SHARE_READ|FILE_SHARE_WRITE,
 						  NULL,
 						  CONSOLE_TEXTMODE_BUFFER,
 						  NULL);
