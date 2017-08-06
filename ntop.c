@@ -924,7 +924,7 @@ static void DrawOptions(const options_column *Columns, int Count)
 		CharsWritten += ConPrintf(_T("%-4s"), Columns[i].Name);
 	}
 
-	for(; CharsWritten < Width-1; CharsWritten++) {
+	for(; CharsWritten < Width; CharsWritten++) {
 		ConPutc(' ');
 	}
 }
@@ -1263,6 +1263,8 @@ int _tmain(int argc, TCHAR *argv[])
 		Die("Could not set active console screen buffer: %ld\n", GetLastError());
 	}
 
+	SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
+
 	atexit(RestoreConsole);
 
 	if(Monochrome) {
@@ -1417,6 +1419,10 @@ int _tmain(int argc, TCHAR *argv[])
 		}
 
 		SetConCursorPos(0, (SHORT)Height-2);
+
+		/* Disable auto newline here. This allows us to fill the last row entirely
+		 * without scrolling the screen buffer accidentally which is really annoying. */
+		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|DISABLE_NEWLINE_AUTO_RETURN);
 		if(!InInputMode) {
 			static options_column OptionColumns[] = {
 				{_T("F1"), _T("ID")},
@@ -1436,10 +1442,14 @@ int _tmain(int argc, TCHAR *argv[])
 		} else {
 			SetColor(Config.BGHighlightColor);
 			CharsWritten = ConPrintf(_T("\n%s: %s_"), InputModeStr, Input);
+
+
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
 			}
+
 		}
+		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
 
 		SetColor(FOREGROUND_WHITE);
 
