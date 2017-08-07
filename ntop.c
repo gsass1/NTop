@@ -1197,7 +1197,7 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T("F6"), _T("Sort list by uptime.") },
 		{ _T("F7"), _T("Execute a command.") },
 		{ _T("F8"), _T("View process tree.") },
-		{ _T("F9"), _T("Kill all tagged processes.") },
+		{ _T("F9, k"), _T("Kill all tagged processes.") },
 		{ _T("F10, q"), _T("Quit.") },
 		{ _T("I"), _T("Invert the sort order.") },
 		{ _T("F"), _T("Follow process: if the sort order causes the currently selected\n"
@@ -1610,7 +1610,7 @@ int _tmain(int argc, TCHAR *argv[])
 				} else if(GetAsyncKeyState(VK_F8)) {
 					NewProcessSortType = SORT_BY_TREE;
 					break;
-				} else if(GetAsyncKeyState(VK_F9)) {
+				} else if(GetAsyncKeyState(VK_F9) || GetAsyncKeyState(0x4b)) /* k */ {
 					if(TaggedProcessListCount != 0) {
 						EnterCriticalSection(&SyncLock);
 						for(DWORD i = 0; i < TaggedProcessListCount; i++) {

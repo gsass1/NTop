@@ -33,8 +33,8 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | F6 								   | Sort list by uptime.  |
 | F7 								   | Execute a command.  |
 | F8 								   | View process tree.  |
-| F9 								   | Kill all tagged processes.  |
-| F10, q 						       | Quit.  |
+| F9, k 							   | Kill all tagged processes.  |
+| F10, q 						       	| Quit.  |
 | I 								   | Invert the sort order.  |
 | F 								   | Follow process: if the sort order causes the currently selected process to move in the list, make the selection bar follow it. Moving the cursor manually automatically disables this feature.  |
 
