@@ -24,6 +24,7 @@
 #include <conio.h>
 #include <Pdh.h>
 #include <stdio.h>
+#include "util.h"
 
 #define NTOP_VER "0.0.1"
 #define SCROLL_INTERVAL 20ULL
@@ -44,29 +45,6 @@ static HANDLE ConsoleHandle;
 static HANDLE OldConsoleHandle;
 static CRITICAL_SECTION SyncLock;
 
-#ifdef _MSC_VER
-	#define NORETURN __declspec(noreturn)
-#elif defined(__GNUC__) && defined(__MINGW32__)
-	#define NORETURN __attribute__((noreturn))
-#else
-	#define NORETURN
-#endif
-
-static NORETURN void Die(TCHAR *Fmt, ...)
-{
-	TCHAR Buffer[1024];
-	va_list VaList;
-
-	va_start(VaList, Fmt);
-	_vstprintf_s(Buffer, _countof(Buffer), Fmt, VaList);
-	va_end(VaList);
-
-	system("cls");
-	WriteFile(GetStdHandle(STD_ERROR_HANDLE), Buffer, sizeof(*Buffer) * (_tcslen(Buffer) + 1), NULL, NULL);
-
-	exit(EXIT_FAILURE);
-}
-
 static int ConPrintf(TCHAR *Fmt, ...)
 {
 	TCHAR Buffer[1024];
@@ -86,26 +64,6 @@ static void ConPutc(char c)
 {
 	DWORD Dummy;
 	WriteConsole(ConsoleHandle, &c, 1, &Dummy, NULL);
-}
-
-static void *xmalloc(size_t size)
-{
-	void *m = malloc(size);
-
-	if(!m)
-		Die("malloc");
-
-	return m;
-}
-
-static void *xrealloc(void *ptr, size_t size)
-{
-	void *m = realloc(ptr, size);
-
-	if(!m)
-		Die("realloc");
-
-	return m;
 }
 
 #define FOREGROUND_WHITE (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
