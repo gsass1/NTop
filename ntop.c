@@ -1479,7 +1479,7 @@ int _tmain(int argc, TCHAR *argv[])
 			 */
 			RedrawAtCursor = FALSE;
 
-			if(!InInputMode) {
+			if(!InInputMode && (GetConsoleWindow() == GetForegroundWindow())) {
 				BOOL Redraw = FALSE;
 				if(GetTickCount64() - LastKeyPress >= SCROLL_INTERVAL) {
 
