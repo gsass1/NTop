@@ -24,9 +24,11 @@
 #include <conio.h>
 #include <Pdh.h>
 #include <stdio.h>
+#include "ntop.h"
 #include "util.h"
+#include "vi.h"
 
-#define NTOP_VER "0.0.1"
+#define NTOP_VER "0.2.0"
 #define SCROLL_INTERVAL 20ULL
 #define REDRAW_INTERVAL 1000ULL
 #define INPUT_LOOP_DELAY 30
@@ -41,7 +43,7 @@ static const int ProcessWindowPosY = 6;
 static DWORD ProcessWindowHeight;
 static DWORD VisibleProcessCount;
 static WORD SavedAttributes;
-static HANDLE ConsoleHandle;
+HANDLE ConsoleHandle;
 static HANDLE OldConsoleHandle;
 static CRITICAL_SECTION SyncLock;
 
@@ -81,6 +83,7 @@ typedef struct config {
 	WORD CPUBarColor;
 	WORD MemoryBarColor;
 	WORD PageMemoryBarColor;
+	WORD ErrorColor;
 } config;
 
 static config Config = {
@@ -94,6 +97,7 @@ static config Config = {
 	FOREGROUND_RED,
 	FOREGROUND_GREEN,
 	FOREGROUND_GREEN,
+	BACKGROUND_RED | FOREGROUND_WHITE,
 };
 
 static config MonochromeConfig = {
@@ -106,6 +110,7 @@ static config MonochromeConfig = {
 	FOREGROUND_WHITE,
 	FOREGROUND_WHITE,
 	FOREGROUND_WHITE,
+	BACKGROUND_WHITE,
 };
 
 static void ParseConfigLine(char *Line)
@@ -141,6 +146,8 @@ static void ParseConfigLine(char *Line)
 		Config.MemoryBarColor = Num;
 	} else if(_strcmpi(Key, "PageMemoryBarColor") == 0) {
 		Config.PageMemoryBarColor = Num;
+	} else if(_strcmpi(Key, "ErrorColor") == 0) {
+		Config.ErrorColor = Num;
 	}
 }
 
@@ -337,18 +344,6 @@ static int SortProcessByParentPID(const void *A, const void *B)
 {
 	return (int)(((const process *)A)->ParentPID - ((const process *)B)->ParentPID);
 }
-
-typedef enum process_sort_type {
-	SORT_BY_ID,
-	SORT_BY_USER_NAME,
-	SORT_BY_PRIORITY,
-	SORT_BY_PROCESSOR_TIME,
-	SORT_BY_USED_MEMORY,
-	SORT_BY_THREAD_COUNT,
-	SORT_BY_UPTIME,
-	SORT_BY_EXE,
-	SORT_BY_TREE,
-} process_sort_type;
 
 static process_sort_type ProcessSortType = SORT_BY_ID;
 
@@ -986,19 +981,6 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 	ConPrintf(_T("%*c"), Width-CharsWritten+1, ' ');
 }
 
-static void ExecCommand(TCHAR *Command)
-{
-	STARTUPINFO StartupInfo;
-	PROCESS_INFORMATION ProcInfo;
-	ZeroMemory(&StartupInfo, sizeof(StartupInfo));
-	ZeroMemory(&ProcInfo, sizeof(ProcInfo));
-	StartupInfo.cb = sizeof(StartupInfo);
-
-	BOOL Ret = CreateProcess(NULL, Command, NULL, NULL, FALSE, 0, NULL, NULL, &StartupInfo, &ProcInfo);
-
-	/* TODO: show error message when failed */
-}
-
 static ULONGLONG KeyPressStart = 0;
 static ULONGLONG LastKeyPress = 0;
 static BOOL KeyPress = FALSE;
@@ -1047,7 +1029,7 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 				OldSelectedProcessIndex = SelectedProcessIndex;
 				SelectedProcessIndex++;
 				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
-					if(ProcessIndex <= ProcessCount - ProcessWindowHeight - 1) {
+					if(ProcessIndex <= ProcessCount - ProcessWindowHeight + 1) {
 						ProcessIndex++;
 						*Redraw = TRUE;
 					}
@@ -1108,6 +1090,22 @@ typedef struct help_entry {
 	TCHAR *Explanation;
 } help_entry;
 
+static void PrintHelpEntries(const TCHAR *Name, int Count, const help_entry *Entries)
+{
+	SetColor(0xE);
+	ConPrintf(_T("%s\n"), Name);
+
+	for(int i = 0; i < Count; i++) {
+		help_entry Entry = Entries[i];
+		SetColor(FOREGROUND_CYAN);
+		ConPrintf(_T("\t%s"), Entry.Key);
+		SetColor(FOREGROUND_WHITE);
+		ConPrintf(_T("\t%s\n"), Entry.Explanation);
+	}
+
+	ConPutc('\n');
+}
+
 static void PrintHelp(const TCHAR *argv0)
 {
 	PrintVersion();
@@ -1126,51 +1124,214 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T("-u USERNAME\n"), _T("\tDisplay only processes of this user.") },
 		{ _T("-v"), _T("Print version.") },
 	};
-
-	SetColor(0xE);
-	ConPrintf(_T("OPTIONS\n"));
-
-	for(int i = 0; i < _countof(Options); i++) {
-		help_entry Entry = Options[i];
-		SetColor(FOREGROUND_CYAN);
-		ConPrintf(_T("\t%s"), Entry.Key);
-		SetColor(FOREGROUND_WHITE);
-		ConPrintf(_T("\t%s\n"), Entry.Explanation);
-	}
-
-	SetColor(0xE);
-	ConPrintf(_T("\nINTERACTIVE COMMANDS\n"));
+	PrintHelpEntries(_T("OPTIONS"), _countof(Options), Options);
 
 	static help_entry InteractiveCommands[] = {
 		{ _T("Up and Down Arrows, PgUp and PgDown\n"), _T("\tScroll through the process list.") },
 		{ _T("g"), _T("Go to the top of the process list.") },
 		{ _T("G"), _T("Go to the bottom of the process list.") },
 		{ _T("Space"), _T("Tag or untag selected process.") },
-		{ _T("U"), _T("Untag all slected processes.") },
-		{ _T("F1"), _T("Sort list by ID.") },
-		{ _T("F2"), _T("Sort list by executable name.") },
-		{ _T("F3"), _T("Sort list by user name.") },
-		{ _T("F4"), _T("Sort list by CPU usage.") },
-		{ _T("F5"), _T("Sort list by memory usage.") },
-		{ _T("F6"), _T("Sort list by uptime.") },
-		{ _T("F7"), _T("Execute a command.") },
-		{ _T("F8"), _T("View process tree.") },
-		{ _T("F9, k"), _T("Kill all tagged processes.") },
-		{ _T("F10, q"), _T("Quit.") },
+		{ _T("U"), _T("Untag all selected processes.") },
+		{ _T("k"), _T("Kill all tagged processes.") },
 		{ _T("I"), _T("Invert the sort order.") },
 		{ _T("F"), _T("Follow process: if the sort order causes the currently selected\n"
 			      "\t\tprocess to move in the list, make the selection bar follow it.\n"
 			      "\t\tMoving the cursor manually automatically disables this feature."
 				) },
 	};
+	PrintHelpEntries(_T("INTERACTIVE COMMANDS"), _countof(InteractiveCommands), InteractiveCommands);
 
-	for(int i = 0; i < _countof(InteractiveCommands); i++) {
-		help_entry Entry = InteractiveCommands[i];
-		SetColor(FOREGROUND_CYAN);
-		ConPrintf(_T("\t%s"), Entry.Key);
-		SetColor(FOREGROUND_WHITE);
-		ConPrintf(_T("\t%s\n"), Entry.Explanation);
+	static help_entry ViCommands[] = {
+		{ _T(":exec CMD\n"), _T("\tExecutes the given Windows command.") },
+		{ _T(":kill PID(s)\n"), _T("\tKill all given processes.") },
+		{ _T(":q, :quit\n"), _T("\tQuit NTop.") },
+		{ _T(":sort COLUMN\n"), _T("\tSort the process list after the given column.") },
+		{ _T(":tree"), _T("View process tree.") },
+	};
+	PrintHelpEntries(_T("VI COMMANDS"), _countof(ViCommands), ViCommands);
+}
+
+int GetProcessSortTypeFromName(const TCHAR *Name, process_sort_type *Dest)
+{
+	if(!lstrcmpi(Name, _T("ID"))) {
+		*Dest = SORT_BY_ID;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("USER"))) {
+		*Dest = SORT_BY_USER_NAME;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("PRI"))) {
+		*Dest = SORT_BY_PRIORITY;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("CPU%"))) {
+		*Dest = SORT_BY_PROCESSOR_TIME;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("MEM"))) {
+		*Dest = SORT_BY_USED_MEMORY;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("THRD"))) {
+		*Dest = SORT_BY_THREAD_COUNT;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("TIME"))) {
+		*Dest = SORT_BY_UPTIME;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("EXE"))) {
+		*Dest = SORT_BY_EXE;
+		return TRUE;
 	}
+
+	return FALSE;
+}
+
+void ChangeProcessSortType(process_sort_type NewProcessSortType)
+{
+	EnterCriticalSection(&SyncLock);
+	ProcessSortType = NewProcessSortType;
+	SortProcessList();
+	ReadjustCursor();
+	LeaveCriticalSection(&SyncLock);
+}
+
+static BOOL ViErrorActive()
+{
+	return _tcslen(ViErrorMessage) > 0;
+}
+
+static void WriteVi(void)
+{
+	SetConCursorPos(0, (SHORT)Height-2);
+
+	if(ViErrorActive()) {
+		/* TODO: This color should be put into the config */
+		SetColor(Config.ErrorColor);
+		int CharsWritten = ConPrintf(_T("\n%s"), ViErrorMessage);
+
+		for (; CharsWritten < Width + 1; CharsWritten++) {
+			ConPutc(' ');
+		}
+	} else {
+		SetColor(FOREGROUND_WHITE);
+		ConPutc('\n');
+		WriteBlankLine();
+	}
+}
+
+static void HideViErrorMessage(void)
+{
+	ViErrorMessage[0] = _T('\0');
+	WriteVi();
+}
+
+static void ClearViMessage(void)
+{
+	if(ViErrorActive()) {
+		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT | DISABLE_NEWLINE_AUTO_RETURN);
+		HideViErrorMessage();
+		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
+	}
+}
+
+static void KillTaggedProcesses(void)
+{
+	for(DWORD i = 0; i < TaggedProcessListCount; ++i) {
+		HANDLE Handle = OpenProcess(PROCESS_TERMINATE, FALSE, TaggedProcessList[i]);
+		if(Handle) {
+			TerminateProcess(Handle, 9);
+			CloseHandle(Handle);
+		}
+	}
+
+	TaggedProcessListCount = 0;
+}
+
+static void ProcessInput(BOOL *Redraw)
+{
+	DWORD NumEvents, Num;
+
+	GetNumberOfConsoleInputEvents(GetStdHandle(STD_INPUT_HANDLE), &NumEvents);
+
+	if(NumEvents == 0) {
+		return;
+	}
+
+	INPUT_RECORD *Records = xmalloc(NumEvents * sizeof(*Records));
+	ReadConsoleInput(GetStdHandle(STD_INPUT_HANDLE), Records, NumEvents, &Num);
+
+	for(DWORD i = 0; i < Num; i++) {
+		INPUT_RECORD InputRecord = Records[i];
+		if (InputRecord.EventType == KEY_EVENT) {
+			if (InputRecord.Event.KeyEvent.bKeyDown) {
+				if(!InInputMode) {
+					switch(InputRecord.Event.KeyEvent.wVirtualKeyCode) {
+					case VK_UP:
+						DoScroll(SCROLL_UP, Redraw);
+						break;
+					case VK_DOWN:
+						DoScroll(SCROLL_DOWN, Redraw);
+						break;
+					case VK_PRIOR:
+						DoScroll(SCROLL_PAGE_UP, Redraw);
+						break;
+					case VK_NEXT:
+						DoScroll(SCROLL_PAGE_DOWN, Redraw);
+						break;
+					case VK_SPACE:
+						ToggleTaggedProcess(ProcessList[SelectedProcessIndex].ID);
+						RedrawAtCursor = TRUE;
+						OldSelectedProcessIndex = SelectedProcessIndex;
+						DoScroll(SCROLL_DOWN, Redraw);
+						break;
+					default:
+						switch(InputRecord.Event.KeyEvent.uChar.AsciiChar) {
+						case 'k':
+							KillTaggedProcesses();
+							break;
+						case 'g':
+							ProcessIndex = SelectedProcessIndex = 0;
+							ClearViMessage();
+							*Redraw = TRUE;
+							break;
+						case 'G':
+							SelectedProcessIndex = ProcessCount - 1;
+							ProcessIndex = SelectedProcessIndex - VisibleProcessCount + 1; 
+							ClearViMessage();
+							*Redraw = TRUE;
+							break;
+						case 'I':
+							EnterCriticalSection(&SyncLock);
+							if(SortOrder == ASCENDING)
+								SortOrder = DESCENDING;
+							else
+								SortOrder = ASCENDING;
+							SortProcessList();
+							ReadjustCursor();
+							LeaveCriticalSection(&SyncLock);
+							*Redraw = TRUE;
+							break;
+						case 'F':
+							FollowProcess = TRUE;
+							FollowProcessID = ProcessList[SelectedProcessIndex].ID;
+							break;
+						case 'U':
+							TaggedProcessListCount = 0;
+							*Redraw = TRUE;
+							break;
+						case ':':
+							ViEnableInput();
+							*Redraw = TRUE;
+							break;
+						}
+						break;
+					}
+				} else {
+					if(ViHandleInputKey(&InputRecord.Event.KeyEvent)) {
+						*Redraw = TRUE;
+					}
+				}
+			}
+		}
+	}
+
+	free(Records);
 }
 
 int _tmain(int argc, TCHAR *argv[])
@@ -1191,23 +1352,7 @@ int _tmain(int argc, TCHAR *argv[])
 				return EXIT_SUCCESS;
 			case 's':
 				if(++i < argc) {
-					if(!lstrcmpi(argv[i], _T("ID"))) {
-						ProcessSortType = SORT_BY_ID;
-					} else if(!lstrcmpi(argv[i], _T("USER"))) {
-						ProcessSortType = SORT_BY_USER_NAME;
-					} else if(!lstrcmpi(argv[i], _T("PRI"))) {
-						ProcessSortType = SORT_BY_PRIORITY;
-					} else if(!lstrcmpi(argv[i], _T("CPU%"))) {
-						ProcessSortType = SORT_BY_PROCESSOR_TIME;
-					} else if(!lstrcmpi(argv[i], _T("MEM"))) {
-						ProcessSortType = SORT_BY_USED_MEMORY;
-					} else if(!lstrcmpi(argv[i], _T("THRD"))) {
-						ProcessSortType = SORT_BY_THREAD_COUNT;
-					} else if(!lstrcmpi(argv[i], _T("TIME"))) {
-						ProcessSortType = SORT_BY_UPTIME;
-					} else if(!lstrcmpi(argv[i], _T("EXE"))) {
-						ProcessSortType = SORT_BY_EXE;
-					} else {
+					if(!GetProcessSortTypeFromName(argv[i], &ProcessSortType)) {
 						ConPrintf(_T("Unknown column: '%s'\n"), argv[i]);
 						return EXIT_FAILURE;
 					}
@@ -1255,11 +1400,11 @@ int _tmain(int argc, TCHAR *argv[])
 						  NULL);
 
 	if(ConsoleHandle == INVALID_HANDLE_VALUE) {
-		Die("Could not create console screen buffer: %ld\n", GetLastError());
+		Die(_T("Could not create console screen buffer: %ld\n"), GetLastError());
 	}
 
 	if(!SetConsoleActiveScreenBuffer(ConsoleHandle)) {
-		Die("Could not set active console screen buffer: %ld\n", GetLastError());
+		Die(_T("Could not set active console screen buffer: %ld\n"), GetLastError());
 	}
 
 	SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
@@ -1276,6 +1421,8 @@ int _tmain(int argc, TCHAR *argv[])
 	NewProcessList = xmalloc(ProcessListSize * sizeof *ProcessList);
 	TaggedProcessList = xmalloc(TaggedProcessListSize * sizeof *TaggedProcessList);
 
+	ViInit();
+
 	PollConsoleInfo();
 	PollInitialSystemInfo();
 	PollSystemInfo();
@@ -1284,9 +1431,6 @@ int _tmain(int argc, TCHAR *argv[])
 	TCHAR MenuBar[256] = { 0 };
 	wsprintf(MenuBar, _T("NTop on %s"), ComputerName);
 
-	BOOL InInputMode = FALSE;
-	TCHAR Input[256] = { 0 };
-	TCHAR InputModeStr[64] = { 0 };
 	int InputIndex = 0;
 
 	ProcessListThread = CreateThread(NULL, 0, PollProcessListThreadProc, NULL, 0, NULL);
@@ -1419,37 +1563,24 @@ int _tmain(int argc, TCHAR *argv[])
 
 		SetConCursorPos(0, (SHORT)Height-2);
 
+		SetColor(FOREGROUND_WHITE);
+
 		/* Disable auto newline here. This allows us to fill the last row entirely
 		 * without scrolling the screen buffer accidentally which is really annoying. */
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|DISABLE_NEWLINE_AUTO_RETURN);
-		if(!InInputMode) {
-			static options_column OptionColumns[] = {
-				{_T("F1"), _T("ID")},
-				{_T("F2"), _T("EXE")},
-				{_T("F3"), _T("USER")},
-				{_T("F4"), _T("CPU%")},
-				{_T("F5"), _T("MEM")},
-				{_T("F6"), _T("TIME")},
-				{_T("F7"), _T("EXEC")},
-				{_T("F8"), _T("TREE")},
-				{_T("F9"), _T("KILL")},
-				{_T("F10"), _T("QUIT")},
-			};
-
-			ConPutc('\n');
-			DrawOptions(OptionColumns, _countof(OptionColumns));
-		} else {
-			SetColor(Config.BGHighlightColor);
-			CharsWritten = ConPrintf(_T("\n%s: %s_"), InputModeStr, Input);
+		if (InInputMode) {
+			CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
 
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
 			}
-
+		} else if(_tcslen(ViErrorMessage) > 0) {
+			WriteVi();
+		} else {
+			ConPutc('\n');
+			WriteBlankLine();
 		}
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
-
-		SetColor(FOREGROUND_WHITE);
 
 #ifdef _DEBUG
 		ULONGLONG T2 = GetTickCount64();
@@ -1478,156 +1609,21 @@ int _tmain(int argc, TCHAR *argv[])
 			 * at each scroll.
 			 */
 			RedrawAtCursor = FALSE;
+			BOOL Redraw = FALSE;
 
-			if(!InInputMode && (GetConsoleWindow() == GetForegroundWindow())) {
-				BOOL Redraw = FALSE;
-				if(GetTickCount64() - LastKeyPress >= SCROLL_INTERVAL) {
+			ProcessInput(&Redraw);
 
-					if(GetAsyncKeyState(VK_UP)) {
-						DoScroll(SCROLL_UP, &Redraw);
-					} else if(GetAsyncKeyState(VK_PRIOR)) {
-						DoScroll(SCROLL_PAGE_UP, &Redraw);
-					} else if(GetAsyncKeyState(VK_DOWN)) {
-						DoScroll(SCROLL_DOWN, &Redraw);
-					} else if(GetAsyncKeyState(VK_NEXT)) {
-						DoScroll(SCROLL_PAGE_DOWN, &Redraw);
-					} else {
-						KeyPress = FALSE;
-					}
+			if(Redraw) {
+				break;
+			}
 
-					if(KeyPress) {
-						/* When cursor moved we stop following any processes */
-						FollowProcess = FALSE;
-					}
+			if(RedrawAtCursor) {
+				SetConCursorPos(0, (SHORT)(ProcessWindowPosY + SelectedProcessIndex - ProcessIndex));
+				WriteProcessInfo(&ProcessList[SelectedProcessIndex], TRUE);
 
-					if(Redraw) {
-						break;
-					}
-				}
-
-				BOOL Shift = GetAsyncKeyState(VK_SHIFT);
-
-				if(GetAsyncKeyState(0x47)) { /* g */
-					if(Shift) {
-						SelectedProcessIndex = ProcessCount - 1;
-						ProcessIndex = SelectedProcessIndex - VisibleProcessCount + 1; 
-					} else {
-						ProcessIndex = 0;
-						SelectedProcessIndex = 0;
-					}
-					break;
-				} else if(Shift && GetAsyncKeyState(0x55)) /* u */ {
-					if(TaggedProcessListCount != 0) {
-						TaggedProcessListCount = 0;
-						break;
-					}
-				} else if(Shift && GetAsyncKeyState(0x49) == -32767) /* i */ {
-					EnterCriticalSection(&SyncLock);
-					if(SortOrder == ASCENDING)
-						SortOrder = DESCENDING;
-					else
-						SortOrder = ASCENDING;
-					SortProcessList();
-					ReadjustCursor();
-					LeaveCriticalSection(&SyncLock);
-					break;
-				} else if(Shift && GetAsyncKeyState(0x46)) /* f */ {
-					FollowProcess = TRUE;
-					FollowProcessID = ProcessList[SelectedProcessIndex].ID;
-				} else if(GetAsyncKeyState(VK_SPACE) == -32767) {
-					ToggleTaggedProcess(ProcessList[SelectedProcessIndex].ID);
-					RedrawAtCursor = TRUE;
-					OldSelectedProcessIndex = SelectedProcessIndex;
-					DoScroll(SCROLL_DOWN, &Redraw);
-					if(Redraw) {
-						break;
-					}
-				} else if(GetAsyncKeyState(VK_F1)) {
-					NewProcessSortType = SORT_BY_ID;
-					break;
-				} else if(GetAsyncKeyState(VK_F2)) {
-					NewProcessSortType = SORT_BY_EXE;
-					break;
-				} else if(GetAsyncKeyState(VK_F3)) {
-					NewProcessSortType = SORT_BY_USER_NAME;
-					break;
-				} else if(GetAsyncKeyState(VK_F4)) {
-					NewProcessSortType = SORT_BY_PROCESSOR_TIME;
-					break;
-				} else if(GetAsyncKeyState(VK_F5)) {
-					NewProcessSortType = SORT_BY_USED_MEMORY;
-					break;
-				} else if(GetAsyncKeyState(VK_F6)) {
-					NewProcessSortType = SORT_BY_UPTIME;
-					break;
-				} else if(GetAsyncKeyState(VK_F7)) {
-					InputMode = EXEC;
-					InInputMode = TRUE;
-					_tcsncpy_s(InputModeStr, _countof(InputModeStr), _T("Command"), 8);
-					break;
-				} else if(GetAsyncKeyState(VK_F8)) {
-					NewProcessSortType = SORT_BY_TREE;
-					break;
-				} else if(GetAsyncKeyState(VK_F9) || GetAsyncKeyState(0x4b)) /* k */ {
-					if(TaggedProcessListCount != 0) {
-						EnterCriticalSection(&SyncLock);
-						for(DWORD i = 0; i < TaggedProcessListCount; i++) {
-							DWORD PID = TaggedProcessList[i];
-							HANDLE Handle = OpenProcess(PROCESS_TERMINATE, FALSE, PID);
-							if(Handle) {
-								TerminateProcess(Handle, 9);
-								CloseHandle(Handle);
-							}
-						}
-						TaggedProcessListCount = 0;
-						LeaveCriticalSection(&SyncLock);
-					}
-				} else if(GetAsyncKeyState(VK_F10) || GetAsyncKeyState(0x51)) /* q */ {
-					exit(EXIT_SUCCESS);
-				}
-
-				if(RedrawAtCursor) {
-					SetConCursorPos(0, (SHORT)(ProcessWindowPosY + SelectedProcessIndex - ProcessIndex));
-					WriteProcessInfo(&ProcessList[SelectedProcessIndex], TRUE);
-
-					if(OldSelectedProcessIndex != SelectedProcessIndex) {
-						SetConCursorPos(0, (SHORT)(ProcessWindowPosY + OldSelectedProcessIndex - ProcessIndex));
-						WriteProcessInfo(&ProcessList[OldSelectedProcessIndex], FALSE);
-					}
-				}
-
-			} else {
-				if(_kbhit()) {
-					char c = _getch();
-					if(c == '\n' || c == '\r') {
-						switch(InputMode) {
-						case EXEC:
-							ExecCommand(Input);
-							break;
-						}
-
-						InputIndex = 0;
-						Input[0] = '\0';
-						InInputMode = FALSE;
-						break;
-					} else {
-						if(c == 0 || c == -32) {
-							_getch();
-						} else if(c == '\x1b') {
-							InInputMode = FALSE;
-							break;
-						} else if(c > 0 && isprint(c) && c != '?') {
-							if(InputIndex < _countof(Input)-1) {
-								Input[InputIndex++] = c;
-							}
-						} else {
-							if(c == '\b') {
-								if(InputIndex != 0)
-									Input[--InputIndex] = '\0';
-							}
-						}
-						break;
-					}
+				if(OldSelectedProcessIndex != SelectedProcessIndex) {
+					SetConCursorPos(0, (SHORT)(ProcessWindowPosY + OldSelectedProcessIndex - ProcessIndex));
+					WriteProcessInfo(&ProcessList[OldSelectedProcessIndex], FALSE);
 				}
 			}
 
@@ -1642,18 +1638,6 @@ int _tmain(int argc, TCHAR *argv[])
 			}
 
 			Sleep(INPUT_LOOP_DELAY);
-		}
-
-		/*
-		 * When process sort type changed, immediately sort the process list
-		 * as waiting for the update thread would not be instantaneous.
-		 */
-		if(NewProcessSortType != ProcessSortType) {
-			EnterCriticalSection(&SyncLock);
-			ProcessSortType = NewProcessSortType;
-			SortProcessList();
-			ReadjustCursor();
-			LeaveCriticalSection(&SyncLock);
 		}
 	}
 

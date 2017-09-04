@@ -1,5 +1,5 @@
 # NTop
-htop-like system-monitor for Windows. Because using Task Manager is not cool enough.
+htop-like system-monitor with Vi-emulation for Windows. Because using Task Manager is not cool enough.
 
 ![NTop](https://user-images.githubusercontent.com/4589491/28242345-6a8fe79a-69a9-11e7-96d6-b1af9db9309c.png)
 
@@ -18,31 +18,31 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | -v			| Print version.  |
 
 ### Interactive commands
-| Key(s)		                       | Purpose		|
+| Key(s)		               | Purpose		|
 | ------------------------------------ | -------------- |
 | Up and Down Arrows, PgUp and PgDown  | Scroll the process list.  |
-| g									   | Go to the top of the process list.  |
-| G									   | Go to the bottom of the process list.  |
-| Space								   | Tag a selected process.  |
-| U									   | Untag all tagged processes.  |
-| F1 								   | Sort list by ID.  |
-| F2 								   | Sort list by executable name.  |
-| F3 								   | Sort list by user name.  |
-| F4 								   | Sort list by CPU usage.  |
-| F5 								   | Sort list by memory usage.  |
-| F6 								   | Sort list by uptime.  |
-| F7 								   | Execute a command.  |
-| F8 								   | View process tree.  |
-| F9, k 							   | Kill all tagged processes.  |
-| F10, q 						       	| Quit.  |
-| I 								   | Invert the sort order.  |
-| F 								   | Follow process: if the sort order causes the currently selected process to move in the list, make the selection bar follow it. Moving the cursor manually automatically disables this feature.  |
+| g				       | Go to the top of the process list.  |
+| G	   			       | Go to the bottom of the process list.  |
+| Space				       | Tag a selected process.  |
+| U				       | Untag all tagged processes.  |
+| k 	   			       | Kill all tagged processes.  |
+| I 				       | Invert the sort order.  |
+| F 				       | Follow process: if the sort order causes the currently selected process to move in the list, make the selection bar follow it. Moving the cursor manually automatically disables this feature.  |
+
+### Vi commands
+| Command(s)		               | Purpose	|
+| ------------------------------------ | -------------- |
+| :exec CMD                            | Executes the given Windows command.  |
+| :kill PID(s)                         | Kill all given processes.  |
+| :q, :quit                            | Quit NTop.  |
+| :sort COLUMN                         | Sort the process list after the given column.  |
+| :tree                                | View process tree.  |
 
 ## Configuration
 The color scheme can be customized through the [ntop.conf](ntop.conf) file. Follow link for example.
 
 ## Building
-Use CMake. Only tested with Visual Studio 2017.
+Use CMake or use the build.bat file. Only tested with Visual Studio 2017.
 
 `cmake .`
 

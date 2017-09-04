@@ -17,6 +17,8 @@ NORETURN void Die(TCHAR *Fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
+extern HANDLE ConsoleHandle;
+
 /*
  * Instant-fail memory allocators as I believe that helps keep the code clean
  */
@@ -26,7 +28,7 @@ void *xmalloc(size_t size)
 	void *m = malloc(size);
 
 	if(!m)
-		Die("malloc");
+		Die(_T("malloc"));
 
 	return m;
 }
@@ -36,8 +38,17 @@ void *xrealloc(void *ptr, size_t size)
 	void *m = realloc(ptr, size);
 
 	if(!m)
-		Die("realloc");
+		Die(_T("realloc"));
 
 	return m;
 }
 
+void *xcalloc(size_t num, size_t size)
+{
+	void *m = calloc(num, size);
+
+	if(!m)
+		Die(_T("calloc"));
+
+	return m;
+}

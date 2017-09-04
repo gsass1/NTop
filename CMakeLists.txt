@@ -7,4 +7,4 @@ if(ENABLE_UNICODE)
 	add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
-add_executable(NTop ntop.c util.c)
+add_executable(NTop ntop.c util.c vi.c)
