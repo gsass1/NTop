@@ -3,7 +3,7 @@
 #include "util.h"
 #include <conio.h>
 #include <stdio.h>
-#include <Windows.h>
+#include <windows.h>
 
 TCHAR *CurrentInputStr;
 TCHAR *ViErrorMessage;

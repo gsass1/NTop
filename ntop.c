@@ -15,14 +15,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <Windows.h>
+#include <windows.h>
 #include <psapi.h>
 #include <lmcons.h>
 #include <tchar.h>
-#include <TlHelp32.h>
+#include <tlhelp32.h>
 #include <assert.h>
 #include <conio.h>
-#include <Pdh.h>
+#include <pdh.h>
 #include <stdio.h>
 #include "ntop.h"
 #include "util.h"

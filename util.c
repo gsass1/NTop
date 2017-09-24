@@ -1,6 +1,6 @@
 #include "util.h"
 #include <stdio.h>
-#include <Windows.h>
+#include <windows.h>
 
 NORETURN void Die(TCHAR *Fmt, ...)
 {
