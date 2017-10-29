@@ -1128,6 +1128,7 @@ static void PrintHelp(const TCHAR *argv0)
 
 	static help_entry InteractiveCommands[] = {
 		{ _T("Up and Down Arrows, PgUp and PgDown\n"), _T("\tScroll through the process list.") },
+		{ _T("CTRL + Left and Right Arrows\n"), _T("\tChange the process sort column.") },
 		{ _T("g"), _T("Go to the top of the process list.") },
 		{ _T("G"), _T("Go to the bottom of the process list.") },
 		{ _T("Space"), _T("Tag or untag selected process.") },
@@ -1243,6 +1244,8 @@ static void KillTaggedProcesses(void)
 	TaggedProcessListCount = 0;
 }
 
+static BOOL CTRLState;
+
 static void ProcessInput(BOOL *Redraw)
 {
 	DWORD NumEvents, Num;
@@ -1255,6 +1258,8 @@ static void ProcessInput(BOOL *Redraw)
 
 	INPUT_RECORD *Records = xmalloc(NumEvents * sizeof(*Records));
 	ReadConsoleInput(GetStdHandle(STD_INPUT_HANDLE), Records, NumEvents, &Num);
+
+	CTRLState = FALSE;
 
 	for(DWORD i = 0; i < Num; i++) {
 		INPUT_RECORD InputRecord = Records[i];
@@ -1279,6 +1284,27 @@ static void ProcessInput(BOOL *Redraw)
 						RedrawAtCursor = TRUE;
 						OldSelectedProcessIndex = SelectedProcessIndex;
 						DoScroll(SCROLL_DOWN, Redraw);
+						break;
+					case VK_CONTROL:
+						CTRLState = TRUE;
+						break;
+					case VK_LEFT:
+						if(ProcessSortType == 0) {
+							ProcessSortType = SORT_TYPE_MAX - 1;
+						} else {
+							--ProcessSortType;
+						}
+						ChangeProcessSortType(ProcessSortType);
+						*Redraw = TRUE;
+						break;
+					case VK_RIGHT:
+						if(ProcessSortType == SORT_TYPE_MAX - 1) {
+							ProcessSortType = 0;
+						} else {
+							++ProcessSortType;
+						}
+						ChangeProcessSortType(ProcessSortType);
+						*Redraw = TRUE;
 						break;
 					default:
 						switch(InputRecord.Event.KeyEvent.uChar.AsciiChar) {

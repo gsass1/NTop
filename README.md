@@ -21,6 +21,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | Key(s)		               | Purpose		|
 | ------------------------------------ | -------------- |
 | Up and Down Arrows, PgUp and PgDown  | Scroll the process list.  |
+| CTRL + Left and Right Arrows\n       | Change the process sort column.  |
 | g				       | Go to the top of the process list.  |
 | G	   			       | Go to the bottom of the process list.  |
 | Space				       | Tag a selected process.  |
