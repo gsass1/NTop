@@ -1121,7 +1121,7 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T("-C"), _T("Use a monochrome color scheme.") },
 		{ _T("-h"), _T("Display this help info.") },
 		{ _T("-p PID,PID...\n"), _T("\tShow only the given PIDs.") },
-		{ _T("-s COLUMN\n"), _T("\tShow only the given PIDs.") },
+		{ _T("-s COLUMN\n"), _T("\tSort by this column.") },
 		{ _T("-u USERNAME\n"), _T("\tDisplay only processes of this user.") },
 		{ _T("-v"), _T("Print version.") },
 	};
@@ -1193,7 +1193,7 @@ void ChangeProcessSortType(process_sort_type NewProcessSortType)
 	LeaveCriticalSection(&SyncLock);
 }
 
-static BOOL ViErrorActive()
+static BOOL ViErrorActive(void)
 {
 	return _tcslen(ViErrorMessage) > 0;
 }
@@ -1248,7 +1248,7 @@ static void KillTaggedProcesses(void)
 static ULONGLONG CaretTicks;
 static BOOLEAN CaretState;
 
-static void ResetCaret()
+static void ResetCaret(void)
 {
 	CaretTicks = GetTickCount64();
 	CaretState = FALSE;
