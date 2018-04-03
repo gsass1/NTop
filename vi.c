@@ -149,6 +149,7 @@ COMMAND_FUNC(sort)
 	process_sort_type NewSortType;
 	if(!GetProcessSortTypeFromName(Argv[0], &NewSortType)) {
 		SetViError(_T("Unknown column: %s"), Argv[0]);
+		return 1;
 	}
 
 	ChangeProcessSortType(NewSortType);
