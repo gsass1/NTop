@@ -32,6 +32,7 @@
 #define SCROLL_INTERVAL 20ULL
 #define REDRAW_INTERVAL 1000ULL
 #define INPUT_LOOP_DELAY 30
+#define CARET_INTERVAL 500
 
 static int Width;
 static int Height;
@@ -1244,6 +1245,15 @@ static void KillTaggedProcesses(void)
 	TaggedProcessListCount = 0;
 }
 
+static ULONGLONG CaretTicks;
+static BOOLEAN CaretState;
+
+static void ResetCaret()
+{
+	CaretTicks = GetTickCount64();
+	CaretState = FALSE;
+}
+
 static BOOL CTRLState;
 
 static void ProcessInput(BOOL *Redraw)
@@ -1343,6 +1353,7 @@ static void ProcessInput(BOOL *Redraw)
 							break;
 						case ':':
 							ViEnableInput();
+							ResetCaret();
 							*Redraw = TRUE;
 							break;
 						}
@@ -1596,6 +1607,10 @@ int _tmain(int argc, TCHAR *argv[])
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|DISABLE_NEWLINE_AUTO_RETURN);
 		if (InInputMode) {
 			CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
+			if(CaretState) {
+				ConPutc((char)219);
+				++CharsWritten;
+			}
 
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
@@ -1657,9 +1672,17 @@ int _tmain(int argc, TCHAR *argv[])
 				break;
 			}
 
-			if(GetTickCount64() - StartTicks >= REDRAW_INTERVAL) {
+			ULONGLONG Now = GetTickCount64();
+
+			if(Now - StartTicks >= REDRAW_INTERVAL) {
 				PollSystemInfo();
-				StartTicks = GetTickCount64();
+				StartTicks = Now;
+				break;
+			}
+
+			if(Now - CaretTicks >= CARET_INTERVAL) {
+				CaretTicks = Now;
+				CaretState = !CaretState;
 				break;
 			}
 
