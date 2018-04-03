@@ -6,11 +6,8 @@
 #include <windows.h>
 
 TCHAR *CurrentInputStr;
-TCHAR *ViErrorMessage;
 int InInputMode = 0;
 static DWORD InputIndex;
-
-#define DEFAULT_STR_SIZE 1024
 
 typedef int (*cmd_fn)(DWORD Argc, TCHAR **Argv);
 
@@ -51,19 +48,10 @@ static void HistoryNext(TCHAR **Str)
 	InputIndex = _tcsclen(*Str);
 }
 
-static void SetViError(TCHAR *Fmt, ...)
-{
-	va_list VaList;
-
-	va_start(VaList, Fmt);
-	_vstprintf_s(ViErrorMessage, DEFAULT_STR_SIZE, Fmt, VaList);
-	va_end(VaList);
-}
-
 COMMAND_FUNC(kill)
 {
 	if(Argc == 0) {
-		SetViError(_T("Usage: kill PID(s)"));
+		SetViMessage(VI_ERROR, _T("Usage: kill PID(s)"));
 		return 1;
 	}
 
@@ -74,18 +62,18 @@ COMMAND_FUNC(kill)
 		 * strtoul returns 0 when conversion failed and we cannot kill pid 0 anyway
 		 */
 		if(Pid == 0) {
-			SetViError(_T("Not a valid pid: %s"), Argv[i]);
+			SetViMessage(VI_ERROR, _T("Not a valid pid: %s"), Argv[i]);
 			continue;
 		}
 
 		HANDLE Handle = OpenProcess(PROCESS_TERMINATE, FALSE, Pid);
 		if(!Handle) {
-			SetViError(_T("Could not open process: %ld: 0x%08x"), Pid, GetLastError());
+			SetViMessage(VI_ERROR, _T("Could not open process: %ld: 0x%08x"), Pid, GetLastError());
 			continue;
 		}
 
 		if(!TerminateProcess(Handle, 9)) {
-			SetViError(_T("Failed to kill process: %ld: 0x%08x"), Pid, GetLastError());
+			SetViMessage(VI_ERROR, _T("Failed to kill process: %ld: 0x%08x"), Pid, GetLastError());
 			CloseHandle(Handle);
 			return 1;
 		}
@@ -100,7 +88,7 @@ COMMAND_FUNC(kill)
 COMMAND_FUNC(tree)
 {
 	if(Argc != 0) {
-		SetViError(_T("Error: trailing characters"));
+		SetViMessage(VI_ERROR, _T("Error: trailing characters"));
 		return 1;
 	}
 
@@ -112,7 +100,7 @@ COMMAND_FUNC(tree)
 COMMAND_FUNC(exec)
 {
 	if(Argc != 1) {
-		SetViError(_T("Usage: exec COMMAND"));
+		SetViMessage(VI_ERROR, _T("Usage: exec COMMAND"));
 		return 1;
 	}
 
@@ -125,7 +113,7 @@ COMMAND_FUNC(exec)
 	BOOL Ret = CreateProcess(NULL, Argv[0], NULL, NULL, FALSE, 0, NULL, NULL, &StartupInfo, &ProcInfo);
 
 	if(!Ret) {
-		SetViError(_T("Failed to create process: 0x%08x"), GetLastError());
+		SetViMessage(VI_ERROR, _T("Failed to create process: 0x%08x"), GetLastError());
 		return 1;
 	}
 
@@ -142,17 +130,31 @@ COMMAND_ALIAS(quit, q);
 COMMAND_FUNC(sort)
 {
 	if(Argc != 1) {
-		SetViError(_T("Usage: sort COLUMN"));
+		SetViMessage(VI_ERROR, _T("Usage: sort COLUMN"));
 		return 1;
 	}
 
 	process_sort_type NewSortType;
 	if(!GetProcessSortTypeFromName(Argv[0], &NewSortType)) {
-		SetViError(_T("Unknown column: %s"), Argv[0]);
+		SetViMessage(VI_ERROR, _T("Unknown column: %s"), Argv[0]);
 		return 1;
 	}
 
 	ChangeProcessSortType(NewSortType);
+
+	return 0;
+}
+
+COMMAND_FUNC(search)
+{
+	if(Argc != 1) {
+		SetViMessage(VI_ERROR, _T("Usage: search pattern"));
+		return 1;
+	}
+
+	if(Argv[0][0] != _T('\0')) {
+		StartSearch(Argv[0]);
+	}
 
 	return 0;
 }
@@ -164,6 +166,7 @@ static cmd Commands[] = {
 	COMMAND(quit),
 	COMMAND(sort),
 	COMMAND(tree),
+	COMMAND(search),
 };
 
 typedef struct cmd_parse_result {
@@ -204,7 +207,7 @@ static TCHAR *EatSpaces(TCHAR *Str)
 
 static BOOL IsValidCharacter(TCHAR c)
 {
-	return (_istalnum(c) || c == _T('%'));
+	return (_istalnum(c) || c == _T('%')) || c == '/';
 }
 
 static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
@@ -310,8 +313,15 @@ static void TryExec(TCHAR *Str)
 {
 	cmd_parse_result ParseResult;
 
+	/* Search has an alias */
+	if(Str[0] == '/') {
+		TCHAR *Args[] = { Str + 1 };
+		search_func(1, Args);
+		return;
+	}
+
 	if(!ParseCommand(Str, &ParseResult)) {
-		SetViError(_T("parse error"));
+		SetViMessage(VI_ERROR, _T("parse error"));
 		return;
 	}
 
@@ -326,14 +336,13 @@ static void TryExec(TCHAR *Str)
 		}
 	}
 
-	SetViError(_T("Not an editor command: %s"), ParseResult.Name);
+	SetViMessage(VI_ERROR, _T("Not an editor command: %s"), ParseResult.Name);
 	FreeCmdParseResult(&ParseResult);
 }
 
 void ViInit(void)
 {
 	CurrentInputStr = xcalloc(DEFAULT_STR_SIZE, 1);
-	ViErrorMessage = xcalloc(DEFAULT_STR_SIZE, 1);
 }
 
 void ViEnableInput(void)
@@ -341,7 +350,7 @@ void ViEnableInput(void)
 	memset(CurrentInputStr, 0, DEFAULT_STR_SIZE * sizeof *CurrentInputStr);
 	_tcscpy(CurrentInputStr, _T(":"));
 
-	ViErrorMessage[0] = 0;
+	ClearViMessage();
 	InInputMode = 1;
 	InputIndex = 1;
 }

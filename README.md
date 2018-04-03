@@ -29,6 +29,8 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | k 	   			       | Kill all tagged processes.  |
 | I 				       | Invert the sort order.  |
 | F 				       | Follow process: if the sort order causes the currently selected process to move in the list, make the selection bar follow it. Moving the cursor manually automatically disables this feature.  |
+| n 				       | Next in search. |
+| N 				       | Previous in search. |
 
 ### Vi commands
 | Command(s)		               | Purpose	|
@@ -36,6 +38,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 | :exec CMD                            | Executes the given Windows command.  |
 | :kill PID(s)                         | Kill all given processes.  |
 | :q, :quit                            | Quit NTop.  |
+| /PATTERN, :search PATTERN            | Do a search.  |
 | :sort COLUMN                         | Sort the process list after the given column.  |
 | :tree                                | View process tree.  |
 
@@ -54,7 +57,7 @@ For enabling Unicode support:
 ## TODO
 * ~~Figure out buggy resizing.~~
 * ~~View process tree.~~
-* Searching.
+* ~~Searching.~~
 * Filtering.
 * All of htop's command line options.
 * At least the most important interactive commands (e.g. ~~following processes~~).

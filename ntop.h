@@ -3,6 +3,8 @@
 
 #include <tchar.h>
 
+#define DEFAULT_STR_SIZE 1024
+
 typedef enum process_sort_type {
 	SORT_BY_ID,
 	SORT_BY_USER_NAME,
@@ -21,5 +23,14 @@ typedef enum process_sort_type {
 
 int GetProcessSortTypeFromName(const TCHAR *Name, process_sort_type *Dest);
 void ChangeProcessSortType(process_sort_type NewProcessSortType);
+void StartSearch(const TCHAR *Pattern);
+
+typedef enum vi_message_type {
+	VI_NOTICE,
+	VI_ERROR,
+} vi_message_type;
+
+void SetViMessage(vi_message_type MessageType, TCHAR *Fmt, ...);
+void ClearViMessage(void);
 
 #endif

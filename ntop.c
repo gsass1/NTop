@@ -500,19 +500,24 @@ static BOOL FilterByPID = FALSE;
 static DWORD PidFilterList[1024];
 static DWORD PidFilterCount;
 
+static void SelectProcess(DWORD Index)
+{
+	SelectedProcessIndex = Index;
+	if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
+		ProcessIndex = SelectedProcessIndex;
+	}
+	if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
+		ProcessIndex = min(ProcessCount - VisibleProcessCount, SelectedProcessIndex);
+	}
+}
+
 static void ReadjustCursor(void)
 {
 	if(FollowProcess) {
 		BOOL Found = FALSE;
 		for(DWORD i = 0; i < ProcessCount; i++) {
 			if(ProcessList[i].ID == FollowProcessID) {
-				SelectedProcessIndex = i;
-				if(SelectedProcessIndex <= ProcessIndex - 1 && ProcessIndex != 0) {
-					ProcessIndex = SelectedProcessIndex;
-				}
-				if(SelectedProcessIndex - ProcessIndex >= VisibleProcessCount) {
-					ProcessIndex = min(ProcessCount - VisibleProcessCount, SelectedProcessIndex);
-				}
+				SelectProcess(i);
 				Found = TRUE;
 				break;
 			}
@@ -527,6 +532,73 @@ static void ReadjustCursor(void)
 		ProcessIndex = min(ProcessIndex, ProcessCount - VisibleProcessCount);
 		SelectedProcessIndex = min(SelectedProcessIndex, ProcessCount - 1);
 	}
+}
+
+static TCHAR SearchPattern[256];
+static BOOLEAN SearchActive;
+
+static void SearchNext(void);
+
+void StartSearch(const TCHAR *Pattern)
+{
+	_tcsncpy_s(SearchPattern, 256, Pattern, 256);
+	SearchActive = TRUE;
+	SearchNext();
+}
+
+static BOOLEAN SearchMatchesProcess(const process *Process)
+{
+	return _tcsstr(Process->ExeName, SearchPattern) != NULL;
+}
+
+static void SearchNext(void)
+{
+	if(!SearchActive) return;
+
+	for(DWORD i = SelectedProcessIndex + 1; i < ProcessCount; ++i) {
+		const process *Process = &ProcessList[i];
+		if(SearchMatchesProcess(Process)) {
+			SelectProcess(i);
+			return;
+		}
+	}
+
+	SetViMessage(VI_NOTICE, _T("search hit BOTTOM, continuing at TOP"));
+
+	for(DWORD i = 0; i <= SelectedProcessIndex; ++i) {
+		const process *Process = &ProcessList[i];
+		if(SearchMatchesProcess(Process)) {
+			SelectProcess(i);
+			return;
+		}
+	}
+
+	SetViMessage(VI_ERROR, _T("Pattern not found: %s"), SearchPattern);
+}
+
+static void SearchPrevious(void)
+{
+	if(!SearchActive) return;
+
+	for(DWORD i = SelectedProcessIndex; i > 0; --i) {
+		const process *Process = &ProcessList[i - 1];
+		if(SearchMatchesProcess(Process)) {
+			SelectProcess(i - 1);
+			return;
+		}
+	}
+
+	SetViMessage(VI_NOTICE, _T("search hit TOP, continuing at BOTTOM"));
+
+	for(DWORD i = ProcessCount; i > SelectedProcessIndex; --i) {
+		const process *Process = &ProcessList[i - 1];
+		if(SearchMatchesProcess(Process)) {
+			SelectProcess(i - 1);
+			return;
+		}
+	}
+
+	SetViMessage(VI_ERROR, _T("Pattern not found: %s"), SearchPattern);
 }
 
 static void PollProcessList(void)
@@ -1140,6 +1212,8 @@ static void PrintHelp(const TCHAR *argv0)
 			      "\t\tprocess to move in the list, make the selection bar follow it.\n"
 			      "\t\tMoving the cursor manually automatically disables this feature."
 				) },
+		{ _T("n"), _T("Next in search.") },
+		{ _T("N"), _T("Previous in search.") },
 	};
 	PrintHelpEntries(_T("INTERACTIVE COMMANDS"), _countof(InteractiveCommands), InteractiveCommands);
 
@@ -1147,6 +1221,7 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T(":exec CMD\n"), _T("\tExecutes the given Windows command.") },
 		{ _T(":kill PID(s)\n"), _T("\tKill all given processes.") },
 		{ _T(":q, :quit\n"), _T("\tQuit NTop.") },
+		{ _T("/PATTERN, :search PATTERN\n"), _T("\tDo a search.") },
 		{ _T(":sort COLUMN\n"), _T("\tSort the process list after the given column.") },
 		{ _T(":tree"), _T("View process tree.") },
 	};
@@ -1193,19 +1268,40 @@ void ChangeProcessSortType(process_sort_type NewProcessSortType)
 	LeaveCriticalSection(&SyncLock);
 }
 
-static BOOL ViErrorActive(void)
+static vi_message_type CurrentViMessageType = VI_NOTICE;
+static TCHAR *ViMessage;
+
+void SetViMessage(vi_message_type MessageType, TCHAR *Fmt, ...)
 {
-	return _tcslen(ViErrorMessage) > 0;
+	CurrentViMessageType = MessageType;
+
+	va_list VaList;
+
+	va_start(VaList, Fmt);
+	_vstprintf_s(ViMessage, DEFAULT_STR_SIZE, Fmt, VaList);
+	va_end(VaList);
+}
+
+static BOOL ViMessageActive(void)
+{
+	return _tcslen(ViMessage) > 0;
 }
 
 static void WriteVi(void)
 {
 	SetConCursorPos(0, (SHORT)Height-2);
 
-	if(ViErrorActive()) {
-		/* TODO: This color should be put into the config */
-		SetColor(Config.ErrorColor);
-		int CharsWritten = ConPrintf(_T("\n%s"), ViErrorMessage);
+	if(ViMessageActive()) {
+		switch(CurrentViMessageType) {
+		case VI_NOTICE:
+			// Default?
+			break;
+		case VI_ERROR:
+			SetColor(Config.ErrorColor);
+			break;
+		}
+
+		int CharsWritten = ConPrintf(_T("\n%s"), ViMessage);
 
 		for (; CharsWritten < Width + 1; CharsWritten++) {
 			ConPutc(' ');
@@ -1217,17 +1313,17 @@ static void WriteVi(void)
 	}
 }
 
-static void HideViErrorMessage(void)
+static void HideViMessage(void)
 {
-	ViErrorMessage[0] = _T('\0');
+	ViMessage[0] = _T('\0');
 	WriteVi();
 }
 
-static void ClearViMessage(void)
+void ClearViMessage(void)
 {
-	if(ViErrorActive()) {
+	if(ViMessageActive()) {
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT | DISABLE_NEWLINE_AUTO_RETURN);
-		HideViErrorMessage();
+		HideViMessage();
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT | ENABLE_WRAP_AT_EOL_OUTPUT);
 	}
 }
@@ -1356,6 +1452,14 @@ static void ProcessInput(BOOL *Redraw)
 							ResetCaret();
 							*Redraw = TRUE;
 							break;
+						case 'n':
+							SearchNext();
+							*Redraw = TRUE;
+							break;
+						case 'N':
+							SearchPrevious();
+							*Redraw = TRUE;
+							break;
 						}
 						break;
 					}
@@ -1458,6 +1562,8 @@ int _tmain(int argc, TCHAR *argv[])
 	NewProcessList = xmalloc(ProcessListSize * sizeof *ProcessList);
 	TaggedProcessList = xmalloc(TaggedProcessListSize * sizeof *TaggedProcessList);
 
+
+	ViMessage = xcalloc(DEFAULT_STR_SIZE, 1);
 	ViInit();
 
 	PollConsoleInfo();
@@ -1615,7 +1721,7 @@ int _tmain(int argc, TCHAR *argv[])
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
 			}
-		} else if(_tcslen(ViErrorMessage) > 0) {
+		} else if(_tcslen(ViMessage) > 0) {
 			WriteVi();
 		} else {
 			ConPutc('\n');
