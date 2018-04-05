@@ -1365,8 +1365,6 @@ static void ProcessInput(BOOL *Redraw)
 	INPUT_RECORD *Records = xmalloc(NumEvents * sizeof(*Records));
 	ReadConsoleInput(GetStdHandle(STD_INPUT_HANDLE), Records, NumEvents, &Num);
 
-	CTRLState = FALSE;
-
 	for(DWORD i = 0; i < Num; i++) {
 		INPUT_RECORD InputRecord = Records[i];
 		if (InputRecord.EventType == KEY_EVENT) {
@@ -1395,22 +1393,26 @@ static void ProcessInput(BOOL *Redraw)
 						CTRLState = TRUE;
 						break;
 					case VK_LEFT:
-						if(ProcessSortType == 0) {
-							ProcessSortType = SORT_TYPE_MAX - 1;
-						} else {
-							--ProcessSortType;
+						if(CTRLState) {
+							if(ProcessSortType == 0) {
+								ProcessSortType = SORT_TYPE_MAX - 1;
+							} else {
+								--ProcessSortType;
+							}
+							ChangeProcessSortType(ProcessSortType);
+							*Redraw = TRUE;
 						}
-						ChangeProcessSortType(ProcessSortType);
-						*Redraw = TRUE;
 						break;
 					case VK_RIGHT:
-						if(ProcessSortType == SORT_TYPE_MAX - 1) {
-							ProcessSortType = 0;
-						} else {
-							++ProcessSortType;
+						if(CTRLState) {
+							if(ProcessSortType == SORT_TYPE_MAX - 1) {
+								ProcessSortType = 0;
+							} else {
+								++ProcessSortType;
+							}
+							ChangeProcessSortType(ProcessSortType);
+							*Redraw = TRUE;
 						}
-						ChangeProcessSortType(ProcessSortType);
-						*Redraw = TRUE;
 						break;
 					default:
 						switch(InputRecord.Event.KeyEvent.uChar.AsciiChar) {
@@ -1466,6 +1468,12 @@ static void ProcessInput(BOOL *Redraw)
 				} else {
 					if(ViHandleInputKey(&InputRecord.Event.KeyEvent)) {
 						*Redraw = TRUE;
+					}
+				}
+			} else {
+				if(!InInputMode) {
+					if(InputRecord.Event.KeyEvent.wVirtualKeyCode == VK_CONTROL) {
+						CTRLState = FALSE;
 					}
 				}
 			}
@@ -1721,7 +1729,7 @@ int _tmain(int argc, TCHAR *argv[])
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
 			}
-		} else if(_tcslen(ViMessage) > 0) {
+		} else if(ViMessageActive()) {
 			WriteVi();
 		} else {
 			ConPutc('\n');
