@@ -1,6 +1,6 @@
 ﻿/* 
  * NTop - an htop clone for Windows
- * Copyright (c) 2017 Gian Sass
+ * Copyright (c) 2018 Gian Sass
  * 
  * This program is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU General Public License as published by  
@@ -1147,7 +1147,7 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 
 static void PrintVersion(void)
 {
-	ConPrintf(_T("NTop " NTOP_VER " - (C) 2017 Gian Sass\n"));
+	ConPrintf(_T("NTop " NTOP_VER " - (C) 2018 Gian Sass\n"));
 	ConPrintf(_T("Compiled on " __DATE__ " " __TIME__ "\n"));
 
 #ifdef _UNICODE
