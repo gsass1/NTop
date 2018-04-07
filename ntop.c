@@ -1189,7 +1189,7 @@ static void PrintHelp(const TCHAR *argv0)
 	SetColor(FOREGROUND_WHITE);
 	ConPrintf(_T("\t%s [OPTIONS]\n\n"), argv0);
 
-	static help_entry Options[] = {
+	const help_entry Options[] = {
 		{ _T("-C"), _T("Use a monochrome color scheme.") },
 		{ _T("-h"), _T("Display this help info.") },
 		{ _T("-p PID,PID...\n"), _T("\tShow only the given PIDs.") },
@@ -1199,14 +1199,14 @@ static void PrintHelp(const TCHAR *argv0)
 	};
 	PrintHelpEntries(_T("OPTIONS"), _countof(Options), Options);
 
-	static help_entry InteractiveCommands[] = {
-		{ _T("Up and Down Arrows, PgUp and PgDown\n"), _T("\tScroll through the process list.") },
+	const help_entry InteractiveCommands[] = {
+		{ _T("Up and Down Arrows, PgUp and PgDown, j and k\n"), _T("\tScroll through the process list.") },
 		{ _T("CTRL + Left and Right Arrows\n"), _T("\tChange the process sort column.") },
 		{ _T("g"), _T("Go to the top of the process list.") },
 		{ _T("G"), _T("Go to the bottom of the process list.") },
 		{ _T("Space"), _T("Tag or untag selected process.") },
 		{ _T("U"), _T("Untag all selected processes.") },
-		{ _T("k"), _T("Kill all tagged processes.") },
+		{ _T("K"), _T("Kill all tagged processes.") },
 		{ _T("I"), _T("Invert the sort order.") },
 		{ _T("F"), _T("Follow process: if the sort order causes the currently selected\n"
 			      "\t\tprocess to move in the list, make the selection bar follow it.\n"
@@ -1217,7 +1217,7 @@ static void PrintHelp(const TCHAR *argv0)
 	};
 	PrintHelpEntries(_T("INTERACTIVE COMMANDS"), _countof(InteractiveCommands), InteractiveCommands);
 
-	static help_entry ViCommands[] = {
+	const help_entry ViCommands[] = {
 		{ _T(":exec CMD\n"), _T("\tExecutes the given Windows command.") },
 		{ _T(":kill PID(s)\n"), _T("\tKill all given processes.") },
 		{ _T(":q, :quit\n"), _T("\tQuit NTop.") },
@@ -1416,7 +1416,7 @@ static void ProcessInput(BOOL *Redraw)
 						break;
 					default:
 						switch(InputRecord.Event.KeyEvent.uChar.AsciiChar) {
-						case 'k':
+						case 'K':
 							KillTaggedProcesses();
 							break;
 						case 'g':
@@ -1461,6 +1461,12 @@ static void ProcessInput(BOOL *Redraw)
 						case 'N':
 							SearchPrevious();
 							*Redraw = TRUE;
+							break;
+						case 'j':
+							DoScroll(SCROLL_DOWN, Redraw);
+							break;
+						case 'k':
+							DoScroll(SCROLL_UP, Redraw);
 							break;
 						}
 						break;

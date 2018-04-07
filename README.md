@@ -20,13 +20,13 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 ### Interactive commands
 | Key(s)		               | Purpose		|
 | ------------------------------------ | -------------- |
-| Up and Down Arrows, PgUp and PgDown  | Scroll the process list.  |
+| Up and Down Arrows, PgUp and PgDown, j and k  | Scroll the process list.  |
 | CTRL + Left and Right Arrows\n       | Change the process sort column.  |
 | g				       | Go to the top of the process list.  |
 | G	   			       | Go to the bottom of the process list.  |
 | Space				       | Tag a selected process.  |
 | U				       | Untag all tagged processes.  |
-| k 	   			       | Kill all tagged processes.  |
+| K 	   			       | Kill all tagged processes.  |
 | I 				       | Invert the sort order.  |
 | F 				       | Follow process: if the sort order causes the currently selected process to move in the list, make the selection bar follow it. Moving the cursor manually automatically disables this feature.  |
 | n 				       | Next in search. |
