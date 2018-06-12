@@ -1468,6 +1468,11 @@ static void ProcessInput(BOOL *Redraw)
 						case 'k':
 							DoScroll(SCROLL_UP, Redraw);
 							break;
+						case 'q':
+						case 'Q':
+							SetViMessage(VI_NOTICE, "To exit, type :q");
+							*Redraw = TRUE;
+							break;
 						}
 						break;
 					}
