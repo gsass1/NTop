@@ -281,20 +281,14 @@ typedef int (*process_sort_fn_t)(const void *, const void *);
 static int SortProcessBy##Attribute(const void *A, const void *B)				\
 {												\
 	int Compare = (int)(((const process *)A)->Attribute - ((const process *)B)->Attribute); \
-	if(SortOrder == ASCENDING)								\
-		return Compare;									\
-	else											\
-		return -Compare;								\
+	return (SortOrder == ASCENDING) ? Compare : -Compare;					\
 }												\
 
 #define SORT_PROCESS_BY_STRING(Attribute, MaxLength)								\
 static int SortProcessBy##Attribute(const void *A, const void *B)						\
 {														\
 	int Compare = _tcsncicmp(((const process *)A)->Attribute, ((const process *)B)->Attribute, MaxLength);	\
-	if(SortOrder == ASCENDING)										\
-		return Compare;											\
-	else													\
-		return -Compare;										\
+	return (SortOrder == ASCENDING) ? Compare : -Compare;							\
 }														\
 
 SORT_PROCESS_BY_INTEGER(ID);
