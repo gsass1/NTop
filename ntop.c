@@ -357,6 +357,7 @@ static void SortProcessList(void)
 			qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortFn);
 		}
 	} else {
+		SortOrder = ASCENDING;
 		qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortProcessByParentPID);
 
 		for(DWORD i = 0; i < ProcessCount; i++) {
