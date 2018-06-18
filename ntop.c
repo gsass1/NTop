@@ -277,74 +277,35 @@ static sort_order SortOrder = DESCENDING;
 
 typedef int (*process_sort_fn_t)(const void *, const void *);
 
-static int SortProcessByID(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return ((const process *)A)->ID - ((const process *)B)->ID;
-	else
-		return ((const process *)B)->ID - ((const process *)A)->ID;
-}
+#define SORT_PROCESS_BY_INTEGER(Attribute)							\
+static int SortProcessBy##Attribute(const void *A, const void *B)				\
+{												\
+	int Compare = (int)(((const process *)A)->Attribute - ((const process *)B)->Attribute); \
+	if(SortOrder == ASCENDING)								\
+		return Compare;									\
+	else											\
+		return -Compare;								\
+}												\
 
-static int SortProcessByExe(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return _tcsncicmp(((const process *)A)->ExeName, ((const process *)B)->ExeName, MAX_PATH);
-	else
-		return _tcsncicmp(((const process *)B)->ExeName, ((const process *)A)->ExeName, MAX_PATH);
-}
+#define SORT_PROCESS_BY_STRING(Attribute, MaxLength)								\
+static int SortProcessBy##Attribute(const void *A, const void *B)						\
+{														\
+	int Compare = _tcsncicmp(((const process *)A)->Attribute, ((const process *)B)->Attribute, MaxLength);	\
+	if(SortOrder == ASCENDING)										\
+		return Compare;											\
+	else													\
+		return -Compare;										\
+}														\
 
-static int SortProcessByUserName(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return _tcsncmp(((const process *)A)->UserName, ((const process *)B)->UserName, UNLEN);
-	else
-		return _tcsncmp(((const process *)B)->UserName, ((const process *)A)->UserName, UNLEN);
-}
-
-static int SortProcessByProcessorTime(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return (int)(((const process *)A)->PercentProcessorTime - ((const process *)A)->PercentProcessorTime);
-	else
-		return (int)(((const process *)B)->PercentProcessorTime - ((const process *)A)->PercentProcessorTime);
-}
-
-static int SortProcessByUsedMemory(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return (int)(((const process *)A)->UsedMemory - ((const process *)B)->UsedMemory);
-	else
-		return (int)(((const process *)B)->UsedMemory - ((const process *)A)->UsedMemory);
-}
-
-static int SortProcessByUpTime(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return (int)(((const process *)A)->UpTime - ((const process *)B)->UpTime);
-	else
-		return (int)(((const process *)B)->UpTime - ((const process *)A)->UpTime);
-}
-
-static int SortProcessByPriority(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return (int)(((const process *)A)->BasePriority - ((const process *)B)->BasePriority);
-	else
-		return (int)(((const process *)B)->BasePriority - ((const process *)A)->BasePriority);
-}
-
-static int SortProcessByThreadCount(const void *A, const void *B)
-{
-	if(SortOrder == ASCENDING)
-		return (int)(((const process *)A)->ThreadCount - ((const process *)B)->ThreadCount);
-	else
-		return (int)(((const process *)B)->ThreadCount - ((const process *)A)->ThreadCount);
-}
-
-static int SortProcessByParentPID(const void *A, const void *B)
-{
-	return (int)(((const process *)A)->ParentPID - ((const process *)B)->ParentPID);
-}
+SORT_PROCESS_BY_INTEGER(ID);
+SORT_PROCESS_BY_INTEGER(PercentProcessorTime);
+SORT_PROCESS_BY_INTEGER(UsedMemory);
+SORT_PROCESS_BY_INTEGER(UpTime);
+SORT_PROCESS_BY_INTEGER(BasePriority);
+SORT_PROCESS_BY_INTEGER(ThreadCount);
+SORT_PROCESS_BY_INTEGER(ParentPID);
+SORT_PROCESS_BY_STRING(ExeName, MAX_PATH);
+SORT_PROCESS_BY_STRING(UserName, UNLEN);
 
 static process_sort_type ProcessSortType = SORT_BY_ID;
 
@@ -376,13 +337,13 @@ static void SortProcessList(void)
 			SortFn = SortProcessByID;
 			break;
 		case SORT_BY_EXE:
-			SortFn = SortProcessByExe;
+			SortFn = SortProcessByExeName;
 			break;
 		case SORT_BY_USER_NAME:
 			SortFn = SortProcessByUserName;
 			break;
 		case SORT_BY_PROCESSOR_TIME:
-			SortFn = SortProcessByProcessorTime;
+			SortFn = SortProcessByPercentProcessorTime;
 			break;
 		case SORT_BY_USED_MEMORY:
 			SortFn = SortProcessByUsedMemory;
@@ -391,7 +352,7 @@ static void SortProcessList(void)
 			SortFn = SortProcessByUpTime;
 			break;
 		case SORT_BY_PRIORITY:
-			SortFn = SortProcessByPriority;
+			SortFn = SortProcessByBasePriority;
 			break;
 		case SORT_BY_THREAD_COUNT:
 			SortFn = SortProcessByThreadCount;
