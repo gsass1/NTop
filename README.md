@@ -1,7 +1,7 @@
 # NTop
 htop-like system-monitor with Vi-emulation for Windows. Because using Task Manager is not cool enough.
 
-![NTop](https://user-images.githubusercontent.com/4589491/28242345-6a8fe79a-69a9-11e7-96d6-b1af9db9309c.png)
+![NTop](https://user-images.githubusercontent.com/4589491/41591971-8327062c-73bb-11e8-8b66-921ebd02e77e.PNG)
 
 NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 
