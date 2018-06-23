@@ -29,7 +29,7 @@ NORETURN void Die(TCHAR *Fmt, ...)
 	va_end(VaList);
 
 	system("cls");
-	WriteFile(GetStdHandle(STD_ERROR_HANDLE), Buffer, sizeof(*Buffer) * (_tcslen(Buffer) + 1), NULL, NULL);
+	WriteFile(GetStdHandle(STD_ERROR_HANDLE), Buffer, sizeof(*Buffer) * (_tcslen(Buffer) + 1), 0, 0);
 
 	exit(EXIT_FAILURE);
 }

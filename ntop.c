@@ -58,7 +58,7 @@ static int ConPrintf(TCHAR *Fmt, ...)
 	va_end(VaList);
 
 	DWORD Dummy;
-	WriteConsole(ConsoleHandle, Buffer, CharsWritten, &Dummy, NULL);
+	WriteConsole(ConsoleHandle, Buffer, CharsWritten, &Dummy, 0);
 
 	return CharsWritten;
 }
@@ -66,7 +66,7 @@ static int ConPrintf(TCHAR *Fmt, ...)
 static void ConPutc(char c)
 {
 	DWORD Dummy;
-	WriteConsole(ConsoleHandle, &c, 1, &Dummy, NULL);
+	WriteConsole(ConsoleHandle, &c, 1, &Dummy, 0);
 }
 
 #define FOREGROUND_WHITE (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
@@ -123,11 +123,11 @@ static void ParseConfigLine(char *Line)
 		return;
 	if(Key[0] == '#') /* Comment char*/
 		return;
-	char *Value = strtok_s(NULL, Delimeter, &Context);
+	char *Value = strtok_s(0, Delimeter, &Context);
 	if(!Value)
 		return;
 
-	WORD Num = (WORD)strtol(Value, NULL, 0);
+	WORD Num = (WORD)strtol(Value, 0, 0);
 
 	if(_strcmpi(Key, "FGColor") == 0) {
 		Config.FGColor = Num;
@@ -326,7 +326,7 @@ static void SortProcessList(void)
 {
 	if(ProcessSortType != SORT_BY_TREE)
 	{
-		process_sort_fn_t SortFn = NULL;
+		process_sort_fn_t SortFn = 0;
 
 		switch(ProcessSortType) {
 		case SORT_BY_ID:
@@ -506,7 +506,7 @@ void StartSearch(const TCHAR *Pattern)
 
 static BOOLEAN SearchMatchesProcess(const process *Process)
 {
-	return _tcsstr(Process->ExeName, SearchPattern) != NULL;
+	return _tcsstr(Process->ExeName, SearchPattern) != 0;
 }
 
 static void SearchNext(void)
@@ -599,7 +599,7 @@ static void PollProcessList(void)
 			if(OpenProcessToken(Process.Handle, TOKEN_READ, &ProcessTokenHandle)) {
 				DWORD ReturnLength;
 
-				GetTokenInformation(ProcessTokenHandle, TokenUser, NULL, 0, &ReturnLength);
+				GetTokenInformation(ProcessTokenHandle, TokenUser, 0, 0, &ReturnLength);
 				if(GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
 					PTOKEN_USER TokenUserStruct = xmalloc(ReturnLength);
 
@@ -609,7 +609,7 @@ static void PollProcessList(void)
 						TCHAR DomainName[MAX_PATH];
 						DWORD DomainLength = MAX_PATH;
 
-						LookupAccountSid(NULL, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse);
+						LookupAccountSid(0, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse);
 					}
 					free(TokenUserStruct);
 				}
@@ -707,7 +707,7 @@ static void PollProcessList(void)
 			Process->UpTime = SubtractTimes(&SysTime, &ProcessTime.CreationTime) / 10000;
 
 			CloseHandle(Process->Handle);
-			Process->Handle = NULL;
+			Process->Handle = 0;
 		}
 	}
 
@@ -799,7 +799,7 @@ static void PollInitialSystemInfo(void)
 	HKEY Key;
 	if(SUCCEEDED(RegOpenKey(HKEY_LOCAL_MACHINE, _T("HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0\\"), &Key))) {
 		DWORD Count = 256;
-		if(SUCCEEDED(RegQueryValueEx(Key, _T("ProcessorNameString"), NULL, NULL, (LPBYTE)&CPUName[0], &Count))) {
+		if(SUCCEEDED(RegQueryValueEx(Key, _T("ProcessorNameString"), 0, 0, (LPBYTE)&CPUName[0], &Count))) {
 			RegCloseKey(Key);
 		}
 	}
@@ -1494,7 +1494,7 @@ int _tmain(int argc, TCHAR *argv[])
 					TCHAR *Token = _tcstok_s(argv[i], Delim, &Context);
 					while(Token) {
 						PidFilterList[PidFilterCount++] = (DWORD)_tstoi(Token);
-						Token = _tcstok_s(NULL, Delim, &Context);
+						Token = _tcstok_s(0, Delim, &Context);
 					}
 
 					if(PidFilterCount != 0) {
@@ -1515,9 +1515,9 @@ int _tmain(int argc, TCHAR *argv[])
 
 	ConsoleHandle = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
 						   FILE_SHARE_READ|FILE_SHARE_WRITE,
-						  NULL,
+						  0,
 						  CONSOLE_TEXTMODE_BUFFER,
-						  NULL);
+						  0);
 
 	if(ConsoleHandle == INVALID_HANDLE_VALUE) {
 		Die(_T("Could not create console screen buffer: %ld\n"), GetLastError());
@@ -1553,7 +1553,7 @@ int _tmain(int argc, TCHAR *argv[])
 	TCHAR MenuBar[256] = { 0 };
 	wsprintf(MenuBar, _T("NTop on %s"), ComputerName);
 
-	ProcessListThread = CreateThread(NULL, 0, PollProcessListThreadProc, NULL, 0, NULL);
+	ProcessListThread = CreateThread(0, 0, PollProcessListThreadProc, 0, 0, 0);
 
 	while(1) {
 #if _DEBUG

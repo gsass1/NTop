@@ -73,7 +73,7 @@ COMMAND_FUNC(kill)
 	}
 
 	for(DWORD i = 0; i < Argc; i++) {
-		DWORD Pid = _tcstoul(Argv[i], NULL, 10);
+		DWORD Pid = _tcstoul(Argv[i], 0, 10);
 
 		/*
 		 * strtoul returns 0 when conversion failed and we cannot kill pid 0 anyway
@@ -129,7 +129,7 @@ COMMAND_FUNC(exec)
 	ZeroMemory(&ProcInfo, sizeof(ProcInfo));
 	StartupInfo.cb = sizeof(StartupInfo);
 
-	BOOL Ret = CreateProcess(NULL, Argv[0], NULL, NULL, FALSE, 0, NULL, NULL, &StartupInfo, &ProcInfo);
+	BOOL Ret = CreateProcess(0, Argv[0], 0, 0, FALSE, 0, 0, 0, &StartupInfo, &ProcInfo);
 
 	if(!Ret) {
 		SetViMessage(VI_ERROR, _T("Failed to create process: 0x%08x"), GetLastError());
@@ -200,7 +200,7 @@ static void PushArg(cmd_parse_result *ParseResult)
 {
 	++ParseResult->Argc;
 
-	if(ParseResult->Args == NULL) {
+	if(ParseResult->Args == 0) {
 		ParseResult->Args = xmalloc(1 * sizeof *ParseResult->Args);
 	} else {
 		ParseResult->Args = xrealloc(ParseResult->Args, ParseResult->Argc * sizeof *ParseResult->Args);
@@ -234,7 +234,7 @@ static BOOL IsValidCharacter(TCHAR c)
 static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
 {
 	Result->Argc = 0;
-	Result->Args = NULL;
+	Result->Args = 0;
 
 	Result->Name = xmalloc(DEFAULT_STR_SIZE * sizeof *Result->Name);
 
