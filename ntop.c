@@ -196,7 +196,9 @@ static void SetColor(WORD Color)
 
 static void SetConCursorPos(SHORT X, SHORT Y)
 {
-	COORD Coord = { X, Y };
+	COORD Coord;
+	Coord.X = X;
+	Coord.Y = Y;
 	SetConsoleCursorPosition(ConsoleHandle, Coord);
 }
 
@@ -621,8 +623,8 @@ static void PollProcessList(void)
 
 		if(FilterByPID) {
 			BOOL InFilter = FALSE;
-			for(DWORD i = 0; i < PidFilterCount; i++) {
-				if(PidFilterList[i] == Process.ID) {
+			for(DWORD PidIndex = 0; i < PidFilterCount; PidIndex++) {
+				if(PidFilterList[PidIndex] == Process.ID) {
 					InFilter = TRUE;
 				}
 			}
@@ -659,9 +661,9 @@ static void PollProcessList(void)
 
 	process_times *ProcessTimes = (process_times *)xmalloc(NewProcessCount * sizeof(*ProcessTimes));
 
-	for(DWORD i = 0; i < NewProcessCount; i++) {
-		const process *Process = &NewProcessList[i];
-		process_times *ProcessTime = &ProcessTimes[i];
+	for(DWORD ProcIndex = 0; ProcIndex < NewProcessCount; ProcIndex++) {
+		const process *Process = &NewProcessList[ProcIndex];
+		process_times *ProcessTime = &ProcessTimes[ProcIndex];
 		if(Process->Handle) {
 			GetProcessTimes(Process->Handle, &ProcessTime->CreationTime, &ProcessTime->ExitTime, &ProcessTime->KernelTime, &ProcessTime->UserTime);
 		}
@@ -679,10 +681,10 @@ static void PollProcessList(void)
 
 	RunningProcessCount = 0;
 
-	for(DWORD i = 0; i < NewProcessCount; i++) {
+	for(DWORD ProcIndex = 0; ProcIndex < NewProcessCount; ProcIndex++) {
 		process_times ProcessTime = { 0 };
-		process_times *PrevProcessTime = &ProcessTimes[i];
-		process *Process = &NewProcessList[i];
+		process_times *PrevProcessTime = &ProcessTimes[ProcIndex];
+		process *Process = &NewProcessList[ProcIndex];
 		if(Process->Handle) {
 			GetProcessTimes(Process->Handle, &ProcessTime.CreationTime, &ProcessTime.ExitTime, &ProcessTime.KernelTime, &ProcessTime.UserTime);
 
@@ -748,7 +750,9 @@ static BOOL PollConsoleInfo(void)
 
 	if(Width != OldWidth || Height != OldHeight) {
 		DisableCursor();
-		COORD Size = { Width, Height };
+		COORD Size;
+		Size.X = (USHORT)Width;
+		Size.Y = (USHORT)Height;
 		SetConsoleScreenBufferSize(ConsoleHandle, Size);
 
 		OldWidth = Width;
@@ -864,8 +868,8 @@ static void WriteBlankLine(void)
 
 static BOOL WINAPI CtrlHandler(DWORD signal)
 {
+	UNREFERENCED_PARAMETER(signal);
 	exit(EXIT_SUCCESS);
-	return TRUE;
 }
 
 typedef struct process_list_column {
@@ -983,7 +987,7 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 				Process->ThreadCount,
 				UpTimeStr
 				);
-		WORD Color = CurrentColor;
+		Color = CurrentColor;
 
 		if(!Highlighted) {
 			SetColor(Config.FGHighlightColor);
@@ -1549,8 +1553,6 @@ int _tmain(int argc, TCHAR *argv[])
 	TCHAR MenuBar[256] = { 0 };
 	wsprintf(MenuBar, _T("NTop on %s"), ComputerName);
 
-	int InputIndex = 0;
-
 	ProcessListThread = CreateThread(NULL, 0, PollProcessListThreadProc, NULL, 0, NULL);
 
 	while(1) {
@@ -1689,7 +1691,7 @@ int _tmain(int argc, TCHAR *argv[])
 		if (InInputMode) {
 			CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
 			if(CaretState) {
-				ConPutc((char)219);
+				ConPutc(219);
 				++CharsWritten;
 			}
 
@@ -1713,9 +1715,6 @@ int _tmain(int argc, TCHAR *argv[])
 		wsprintf(DebugBuffer, _T("Drawing took: %lu ms\n"), Diff);
 		OutputDebugString(DebugBuffer);
 #endif
-
-		process_sort_type NewProcessSortType = ProcessSortType;
-		BOOL SortOrderChanged = FALSE;
 		ULONGLONG StartTicks = GetTickCount64();
 
 		/*

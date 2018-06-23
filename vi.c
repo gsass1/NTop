@@ -104,6 +104,8 @@ COMMAND_FUNC(kill)
 
 COMMAND_FUNC(tree)
 {
+	UNREFERENCED_PARAMETER(Argv);
+
 	if(Argc != 0) {
 		SetViMessage(VI_ERROR, _T("Error: trailing characters"));
 		return 1;
@@ -139,8 +141,10 @@ COMMAND_FUNC(exec)
 
 COMMAND_FUNC(q)
 {
+	UNREFERENCED_PARAMETER(Argc);
+	UNREFERENCED_PARAMETER(Argv);
+
 	exit(EXIT_SUCCESS);
-	return 0;
 }
 COMMAND_ALIAS(quit, q);
 
@@ -257,9 +261,6 @@ static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
 		return FALSE;
 	}
 
-	int ArgIndex = 0;
-	DWORD ArgsSize = 16;
-
 	int InQuotes = FALSE;
 
 	if(*Str != '\0') {
@@ -332,7 +333,8 @@ static void TryExec(TCHAR *Str)
 
 	/* Search has an alias */
 	if(Str[0] == '/') {
-		TCHAR *Args[] = { Str + 1 };
+		TCHAR *Args[1];
+		Args[0] = Str + 1;
 		search_func(1, Args);
 		return;
 	}
@@ -346,8 +348,7 @@ static void TryExec(TCHAR *Str)
 		cmd *Command = &Commands[i];
 
 		if(_tcsicmp(Command->Name, ParseResult.Name) == 0) {
-			/* TODO: what to do with the error? */
-			int Ret = Command->CmdFunc(ParseResult.Argc, ParseResult.Args);
+			Command->CmdFunc(ParseResult.Argc, ParseResult.Args);
 			FreeCmdParseResult(&ParseResult);
 			return;
 		}
@@ -365,7 +366,7 @@ void ViInit(void)
 void ViEnableInput(void)
 {
 	memset(CurrentInputStr, 0, DEFAULT_STR_SIZE * sizeof *CurrentInputStr);
-	_tcscpy(CurrentInputStr, _T(":"));
+	_tcsncpy_s(CurrentInputStr, DEFAULT_STR_SIZE, _T(":"), 1);
 
 	ClearViMessage();
 	InInputMode = 1;
