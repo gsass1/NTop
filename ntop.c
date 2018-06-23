@@ -1307,7 +1307,7 @@ static BOOLEAN CaretState;
 static void ResetCaret(void)
 {
 	CaretTicks = GetTickCount64();
-	CaretState = FALSE;
+	CaretState = TRUE;
 }
 
 static BOOL CTRLState;
