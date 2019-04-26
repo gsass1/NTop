@@ -1,6 +1,6 @@
 /* 
  * NTop - an htop clone for Windows
- * Copyright (c) 2018 Gian Sass
+ * Copyright (c) 2019 Gian Sass
  * 
  * This program is free software: you can redistribute it and/or modify  
  * it under the terms of the GNU General Public License as published by  
@@ -29,6 +29,7 @@ typedef enum process_sort_type {
 	SORT_BY_PROCESSOR_TIME,
 	SORT_BY_USED_MEMORY,
 	SORT_BY_THREAD_COUNT,
+	SORT_BY_DISK_USAGE,
 	SORT_BY_UPTIME,
 	SORT_BY_EXE,
 	// NOTE: declaring SORT_TYPE_MAX before SORT_BY_TREE is there solely
