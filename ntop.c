@@ -213,6 +213,9 @@ typedef struct process {
 	ULONGLONG UpTime;
 	TCHAR ExeName[MAX_PATH];
 	DWORD ParentPID;
+	ULONGLONG DiskOperationsPrev;
+	ULONGLONG DiskOperations;
+	DWORD DiskUsage;
 	DWORD TreeDepth;
 } process;
 
@@ -300,6 +303,7 @@ SORT_PROCESS_BY_INTEGER(UpTime);
 SORT_PROCESS_BY_INTEGER(BasePriority);
 SORT_PROCESS_BY_INTEGER(ThreadCount);
 SORT_PROCESS_BY_INTEGER(ParentPID);
+SORT_PROCESS_BY_INTEGER(DiskUsage);
 SORT_PROCESS_BY_STRING(ExeName, MAX_PATH);
 SORT_PROCESS_BY_STRING(UserName, UNLEN);
 
@@ -352,6 +356,9 @@ static void SortProcessList(void)
 			break;
 		case SORT_BY_THREAD_COUNT:
 			SortFn = SortProcessByThreadCount;
+			break;
+		case SORT_BY_DISK_USAGE:
+			SortFn = SortProcessByDiskUsage;
 			break;
 		}
 
@@ -559,7 +566,7 @@ static void SearchPrevious(void)
 	SetViMessage(VI_ERROR, _T("Pattern not found: %s"), SearchPattern);
 }
 
-static void PollProcessList(void)
+static void PollProcessList(DWORD UpdateTime)
 {
 	HANDLE Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, 0);
 	if(!Snapshot) {
@@ -662,14 +669,19 @@ static void PollProcessList(void)
 	process_times *ProcessTimes = (process_times *)xmalloc(NewProcessCount * sizeof(*ProcessTimes));
 
 	for(DWORD ProcIndex = 0; ProcIndex < NewProcessCount; ProcIndex++) {
-		const process *Process = &NewProcessList[ProcIndex];
+		process *Process = &NewProcessList[ProcIndex];
 		process_times *ProcessTime = &ProcessTimes[ProcIndex];
 		if(Process->Handle) {
 			GetProcessTimes(Process->Handle, &ProcessTime->CreationTime, &ProcessTime->ExitTime, &ProcessTime->KernelTime, &ProcessTime->UserTime);
+
+			IO_COUNTERS IoCounters;
+			if(GetProcessIoCounters(Process->Handle, &IoCounters)) {
+				Process->DiskOperationsPrev = IoCounters.ReadTransferCount + IoCounters.WriteTransferCount;
+			}
 		}
 	}
 
-	Sleep(200);
+	Sleep(UpdateTime);
 
 	system_times SysTimes;
 
@@ -705,6 +717,12 @@ static void PollProcessList(void)
 			GetSystemTimeAsFileTime(&SysTime);
 
 			Process->UpTime = SubtractTimes(&SysTime, &ProcessTime.CreationTime) / 10000;
+
+			IO_COUNTERS IoCounters;
+			if(GetProcessIoCounters(Process->Handle, &IoCounters)) {
+				Process->DiskOperations = IoCounters.ReadTransferCount + IoCounters.WriteTransferCount;
+				Process->DiskUsage = (DWORD)((Process->DiskOperations - Process->DiskOperationsPrev) * (1000/UpdateTime));
+			}
 
 			CloseHandle(Process->Handle);
 			Process->Handle = 0;
@@ -831,8 +849,7 @@ DWORD WINAPI PollProcessListThreadProc(LPVOID lpParam)
 	UNREFERENCED_PARAMETER(lpParam);
 
 	while(1) {
-		PollProcessList();
-		Sleep(800);
+		PollProcessList(1000);
 	}
 	return 0;
 }
@@ -978,13 +995,14 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 			_tcscat_s(OffsetStr, _countof(OffsetStr), _T("`- "));
 		}
 
-		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s"),
+		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %4u %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
 				Process->PercentProcessorTime,
 				(double)Process->UsedMemory / 1000000.0,
 				Process->ThreadCount,
+				Process->DiskUsage,
 				UpTimeStr
 				);
 		Color = CurrentColor;
@@ -998,13 +1016,14 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 
 		CharsWritten += ConPrintf(_T("%s"), Process->ExeName);
 	} else {
-		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %s  %s"),
+		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  % 03.1f MB/s  %s  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
 				Process->PercentProcessorTime,
 				(double)Process->UsedMemory / 1000000.0,
 				Process->ThreadCount,
+				ceil((double)Process->DiskUsage / 1000000.0 * 10.0) / 10.0,
 				UpTimeStr,
 				Process->ExeName
 				);
@@ -1169,8 +1188,8 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T("K"), _T("Kill all tagged processes.") },
 		{ _T("I"), _T("Invert the sort order.") },
 		{ _T("F"), _T("Follow process: if the sort order causes the currently selected\n"
-			      "\t\tprocess to move in the list, make the selection bar follow it.\n"
-			      "\t\tMoving the cursor manually automatically disables this feature."
+				"\t\tprocess to move in the list, make the selection bar follow it.\n"
+				"\t\tMoving the cursor manually automatically disables this feature."
 				) },
 		{ _T("n"), _T("Next in search.") },
 		{ _T("N"), _T("Previous in search.") },
@@ -1213,6 +1232,9 @@ int GetProcessSortTypeFromName(const TCHAR *Name, process_sort_type *Dest)
 		return TRUE;
 	} else if(!lstrcmpi(Name, _T("EXE"))) {
 		*Dest = SORT_BY_EXE;
+		return TRUE;
+	} else if(!lstrcmpi(Name, _T("DISK"))) {
+		*Dest = SORT_BY_DISK_USAGE;
 		return TRUE;
 	}
 
@@ -1514,7 +1536,7 @@ int _tmain(int argc, TCHAR *argv[])
 	OldConsoleHandle = ConsoleHandle;
 
 	ConsoleHandle = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
-						   FILE_SHARE_READ|FILE_SHARE_WRITE,
+						  FILE_SHARE_READ|FILE_SHARE_WRITE,
 						  0,
 						  CONSOLE_TEXTMODE_BUFFER,
 						  0);
@@ -1548,7 +1570,7 @@ int _tmain(int argc, TCHAR *argv[])
 	PollConsoleInfo();
 	PollInitialSystemInfo();
 	PollSystemInfo();
-	PollProcessList();
+	PollProcessList(50);
 
 	TCHAR MenuBar[256] = { 0 };
 	wsprintf(MenuBar, _T("NTop on %s"), ComputerName);
@@ -1648,15 +1670,16 @@ int _tmain(int argc, TCHAR *argv[])
 		ProcessWindowHeight = Height - ProcessWindowPosY;
 		VisibleProcessCount = ProcessWindowHeight - 2;
 
-		static process_list_column ProcessListColumns[] = {
+		const process_list_column ProcessListColumns[] = {
 			{ _T("ID"),	6 },
 			{ _T("USER"),	9 },
 			{ _T("PRI"),	3 },
 			{ _T("CPU%"),	5 },
 			{ _T("MEM"),	9 },
 			{ _T("THRD"),	4 },
+			{ _T("DISK"),	9 },
 			{ _T("TIME"),	TIME_STR_SIZE - 1 },
-			{ _T("EXE"),	-1 },
+			{ _T("COMMAND"),	-1 },
 		};
 
 		DrawProcessListHeader(ProcessListColumns, _countof(ProcessListColumns));
