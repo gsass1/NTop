@@ -24,6 +24,7 @@
 #include <conio.h>
 #include <pdh.h>
 #include <stdio.h>
+#include <math.h>
 #include "ntop.h"
 #include "util.h"
 #include "vi.h"
@@ -995,14 +996,14 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 			_tcscat_s(OffsetStr, _countof(OffsetStr), _T("`- "));
 		}
 
-		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  %4u %s"),
+		CharsWritten = ConPrintf(_T("\n%6u  %9s  %3u  %04.1f%%  % 6.1f MB  %4u  % 03.1f MB/s  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
 				Process->PercentProcessorTime,
 				(double)Process->UsedMemory / 1000000.0,
 				Process->ThreadCount,
-				Process->DiskUsage,
+				ceil((double)Process->DiskUsage / 1000000.0 * 10.0) / 10.0,
 				UpTimeStr
 				);
 		Color = CurrentColor;
