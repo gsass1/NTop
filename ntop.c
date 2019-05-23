@@ -618,6 +618,9 @@ static void PollProcessList(DWORD UpdateTime)
 						DWORD DomainLength = MAX_PATH;
 
 						LookupAccountSid(0, TokenUserStruct->User.Sid, Process.UserName, &NameLength, DomainName, &DomainLength, &NameUse);
+
+						// FIXME: we cut user name here for display purposes because something like %9.9s does not work with MS's vsprintf function?
+						Process.UserName[9] = 0;
 					}
 					free(TokenUserStruct);
 				}
