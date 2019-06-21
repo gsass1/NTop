@@ -1581,7 +1581,7 @@ int _tmain(int argc, TCHAR *argv[])
 
 	ProcessListThread = CreateThread(0, 0, PollProcessListThreadProc, 0, 0, 0);
 
-    ULONGLONG StartTicks = GetTickCount64();
+	ULONGLONG StartTicks = GetTickCount64();
 
 	while(1) {
 #if _DEBUG
