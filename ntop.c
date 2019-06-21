@@ -1581,6 +1581,8 @@ int _tmain(int argc, TCHAR *argv[])
 
 	ProcessListThread = CreateThread(0, 0, PollProcessListThreadProc, 0, 0, 0);
 
+    ULONGLONG StartTicks = GetTickCount64();
+
 	while(1) {
 #if _DEBUG
 		ULONGLONG T1 = GetTickCount64();
@@ -1742,7 +1744,6 @@ int _tmain(int argc, TCHAR *argv[])
 		wsprintf(DebugBuffer, _T("Drawing took: %lu ms\n"), Diff);
 		OutputDebugString(DebugBuffer);
 #endif
-		ULONGLONG StartTicks = GetTickCount64();
 
 		/*
 		 * Input loop. Breaks after REDRAW_INTERVAL ms or if forced.
