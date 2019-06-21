@@ -29,7 +29,7 @@
 #include "util.h"
 #include "vi.h"
 
-#define NTOP_VER "0.2.0"
+#define NTOP_VER "0.3.2"
 #define SCROLL_INTERVAL 20ULL
 #define REDRAW_INTERVAL 1000ULL
 #define INPUT_LOOP_DELAY 30
