@@ -634,7 +634,7 @@ static void PollProcessList(DWORD UpdateTime)
 
 		if(FilterByPID) {
 			BOOL InFilter = FALSE;
-			for(DWORD PidIndex = 0; i < PidFilterCount; PidIndex++) {
+			for(DWORD PidIndex = 0; PidIndex < PidFilterCount; PidIndex++) {
 				if(PidFilterList[PidIndex] == Process.ID) {
 					InFilter = TRUE;
 				}
