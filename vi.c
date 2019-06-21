@@ -363,10 +363,10 @@ void ViInit(void)
 	CurrentInputStr = xcalloc(DEFAULT_STR_SIZE, 1);
 }
 
-void ViEnableInput(void)
+void ViEnableInput(TCHAR InitialKey)
 {
 	memset(CurrentInputStr, 0, DEFAULT_STR_SIZE * sizeof *CurrentInputStr);
-	_tcsncpy_s(CurrentInputStr, DEFAULT_STR_SIZE, _T(":"), 1);
+	CurrentInputStr[0] = InitialKey;
 
 	ClearViMessage();
 	InInputMode = 1;

@@ -28,7 +28,7 @@ typedef struct _KEY_EVENT_RECORD KEY_EVENT_RECORD;
 void ViInit(void);
 int ViHandleInputKey(KEY_EVENT_RECORD *KeyEvent);
 void ViExecInput(void);
-void ViEnableInput(void);
+void ViEnableInput(TCHAR InitialKey);
 void ViDisableInput(void);
 void SetViError(TCHAR *Fmt, ...);
 

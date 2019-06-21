@@ -1435,8 +1435,13 @@ static void ProcessInput(BOOL *Redraw)
 							TaggedProcessListCount = 0;
 							*Redraw = TRUE;
 							break;
+						case '/':
+							ViEnableInput('/');
+							ResetCaret();
+							*Redraw = TRUE;
+							break;
 						case ':':
-							ViEnableInput();
+							ViEnableInput(':');
 							ResetCaret();
 							*Redraw = TRUE;
 							break;
