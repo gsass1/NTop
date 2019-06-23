@@ -1053,6 +1053,7 @@ typedef enum scroll_type {
 static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 {
 	ULONGLONG Now = GetTickCount64();
+	FollowProcess = FALSE;
 
 	if(!KeyPress) {
 		KeyPress = TRUE;
