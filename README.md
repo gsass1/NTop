@@ -1,9 +1,19 @@
 # NTop
+
+[![Latest Release](https://img.shields.io/github/release/Nuke928/NTop.svg)](https://github.com/Nuke928/NTop/releases/latest)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 htop-like system-monitor with Vi-emulation for Windows. Because using Task Manager is not cool enough.
 
 ![NTop](https://user-images.githubusercontent.com/4589491/56905702-3c3d5c80-6a90-11e9-991c-b7a398742614.PNG)
 
 NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
+
+## Installation with Chocolatey
+
+`choco install ntop.portable --version 0.3.0`
+
+Note: the Chocolatey package is still awaiting full approval.
 
 ## Usage
 
