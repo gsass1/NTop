@@ -29,7 +29,13 @@
 #include "util.h"
 #include "vi.h"
 
-#define NTOP_VER "0.3.2"
+#ifndef NTOP_VER
+#define NTOP_VER "dev"
+#endif
+
+#define STRINGIZE(x) #x
+#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
+
 #define SCROLL_INTERVAL 20ULL
 #define REDRAW_INTERVAL 1000ULL
 #define INPUT_LOOP_DELAY 30
@@ -1131,7 +1137,7 @@ static void DoScroll(scroll_type ScrollType, BOOL *Redraw)
 
 static void PrintVersion(void)
 {
-	ConPrintf(_T("NTop " NTOP_VER " - (C) 2018 Gian Sass\n"));
+	ConPrintf(_T("NTop " STRINGIZE_VALUE_OF(NTOP_VER) " - (C) 2019 Gian Sass\n"));
 	ConPrintf(_T("Compiled on " __DATE__ " " __TIME__ "\n"));
 
 #ifdef _UNICODE
