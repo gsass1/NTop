@@ -9,10 +9,13 @@
     <summary>htop-like system-monitor for Windows with Vi-keybindings</summary>
     <description>htop-like system-monitor with Vi-emulation for Windows. Because using Task Manager is not cool enough.</description>
     <projectUrl>https://github.com/Nuke928/NTop</projectUrl>
-    <packageSourceUrl>https://github.com/Nuke928/NTop</packageSourceUrl>
+    <projectSourceUrl>https://github.com/Nuke928/NTop</projectSourceUrl>
+    <packageSourceUrl>https://github.com/Nuke928/NTop/blob/master/ntop.nuspec</packageSourceUrl>
     <tags>htop top console-application c system-monitor</tags>
     <licenseUrl>https://github.com/Nuke928/NTop/blob/master/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <bugTrackerUrl>https://github.com/Nuke928/NTop/issues</bugTrackerUrl>
+    <docsUrl>https://github.com/Nuke928/NTop/blob/master/README.md</docsUrl>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />
