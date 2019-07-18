@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <metadata>
+    <id>NTop.Portable</id>
+    <title>NTop</title>
+    <version>0.3.2</version>
+    <authors>Gian Sass</authors>
+    <owners>Gian Sass</owners>
+    <summary>htop-like system-monitor for Windows with Vi-keybindings</summary>
+    <description>htop-like system-monitor with Vi-emulation for Windows. Because using Task Manager is not cool enough.</description>
+    <projectUrl>https://github.com/Nuke928/NTop</projectUrl>
+    <packageSourceUrl>https://github.com/Nuke928/NTop</packageSourceUrl>
+    <tags>htop top console-application c system-monitor</tags>
+    <licenseUrl>https://github.com/Nuke928/NTop/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
