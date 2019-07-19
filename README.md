@@ -11,9 +11,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 
 ## Installation with Chocolatey
 
-`choco install ntop.portable --version 0.3.0`
-
-Note: the Chocolatey package is still awaiting full approval.
+`choco install ntop.portable`
 
 ## Usage
 
