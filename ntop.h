@@ -31,7 +31,7 @@ typedef enum process_sort_type {
 	SORT_BY_THREAD_COUNT,
 	SORT_BY_DISK_USAGE,
 	SORT_BY_UPTIME,
-	SORT_BY_EXE,
+	SORT_BY_PROCESS,
 	// NOTE: declaring SORT_TYPE_MAX before SORT_BY_TREE is there solely
 	// because we do not actually treat it as an actual sort type, but the
 	// code in ProcessInput thinks it is.

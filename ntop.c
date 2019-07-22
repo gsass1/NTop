@@ -343,7 +343,7 @@ static void SortProcessList(void)
 		case SORT_BY_ID:
 			SortFn = SortProcessByID;
 			break;
-		case SORT_BY_EXE:
+		case SORT_BY_PROCESS:
 			SortFn = SortProcessByExeName;
 			break;
 		case SORT_BY_USER_NAME:
@@ -1241,8 +1241,8 @@ int GetProcessSortTypeFromName(const TCHAR *Name, process_sort_type *Dest)
 	} else if(!lstrcmpi(Name, _T("TIME"))) {
 		*Dest = SORT_BY_UPTIME;
 		return TRUE;
-	} else if(!lstrcmpi(Name, _T("EXE"))) {
-		*Dest = SORT_BY_EXE;
+	} else if(!lstrcmpi(Name, _T("PROCESS"))) {
+		*Dest = SORT_BY_PROCESS;
 		return TRUE;
 	} else if(!lstrcmpi(Name, _T("DISK"))) {
 		*Dest = SORT_BY_DISK_USAGE;
@@ -1697,7 +1697,7 @@ int _tmain(int argc, TCHAR *argv[])
 			{ _T("THRD"),	4 },
 			{ _T("DISK"),	9 },
 			{ _T("TIME"),	TIME_STR_SIZE - 1 },
-			{ _T("COMMAND"),	-1 },
+			{ _T("PROCESS"),	-1 },
 		};
 
 		DrawProcessListHeader(ProcessListColumns, _countof(ProcessListColumns));
