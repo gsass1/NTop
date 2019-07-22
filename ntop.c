@@ -194,9 +194,11 @@ static void ReadConfigFile(void)
 }
 
 static WORD CurrentColor;
+static WORD ColorOverride;
 
 static void SetColor(WORD Color)
 {
+	Color |= ColorOverride;
 	CurrentColor = Color;
 	SetConsoleTextAttribute(ConsoleHandle, Color);
 }
@@ -766,6 +768,13 @@ static void DisableCursor(void)
 	SetConsoleCursorInfo(ConsoleHandle, &CursorInfo);
 }
 
+static WORD GetConsoleColor(void)
+{
+	CONSOLE_SCREEN_BUFFER_INFO Csbi;
+	GetConsoleScreenBufferInfo(ConsoleHandle, &Csbi);
+	return Csbi.wAttributes;
+}
+
 /*
  * Returns TRUE on screen buffer resize.
  */
@@ -1171,6 +1180,7 @@ static void PrintHelpEntries(const TCHAR *Name, int Count, const help_entry *Ent
 
 static void PrintHelp(const TCHAR *argv0)
 {
+	ColorOverride = GetConsoleColor();
 	PrintVersion();
 
 	SetColor(0xE);
@@ -1216,6 +1226,8 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T(":tree"), _T("View process tree.") },
 	};
 	PrintHelpEntries(_T("VI COMMANDS"), _countof(ViCommands), ViCommands);
+
+	SetColor(ColorOverride);
 }
 
 int GetProcessSortTypeFromName(const TCHAR *Name, process_sort_type *Dest)
