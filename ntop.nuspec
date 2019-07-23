@@ -16,6 +16,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <bugTrackerUrl>https://github.com/Nuke928/NTop/issues</bugTrackerUrl>
     <docsUrl>https://github.com/Nuke928/NTop/blob/master/README.md</docsUrl>
+    <releaseNotes>https://github.com/Nuke928/NTop/releases</releaseNotes>
   </metadata>
   <files>
     <file src="tools\**" target="tools" />
