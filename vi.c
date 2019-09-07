@@ -118,9 +118,20 @@ COMMAND_FUNC(tree)
 
 COMMAND_FUNC(exec)
 {
-	if(Argc != 1) {
+	if(Argc == 0) {
 		SetViMessage(VI_ERROR, _T("Usage: exec COMMAND"));
 		return 1;
+	}
+
+	TCHAR CommandLine[4096] = { 0 };
+
+	for(DWORD i = 0; i < Argc; ++i) {
+		_tcscat_s(CommandLine, _countof(CommandLine), Argv[i]);
+
+		if(i != Argc - 1) {
+			DWORD Length = _tcslen(CommandLine);
+			CommandLine[Length] = L' ';
+		}
 	}
 
 	STARTUPINFO StartupInfo;
@@ -129,7 +140,7 @@ COMMAND_FUNC(exec)
 	ZeroMemory(&ProcInfo, sizeof(ProcInfo));
 	StartupInfo.cb = sizeof(StartupInfo);
 
-	BOOL Ret = CreateProcess(0, Argv[0], 0, 0, FALSE, 0, 0, 0, &StartupInfo, &ProcInfo);
+	BOOL Ret = CreateProcess(0, CommandLine, 0, 0, FALSE, 0, 0, 0, &StartupInfo, &ProcInfo);
 
 	if(!Ret) {
 		SetViMessage(VI_ERROR, _T("Failed to create process: 0x%08x"), GetLastError());
@@ -228,7 +239,7 @@ static TCHAR *EatSpaces(TCHAR *Str)
 
 static BOOL IsValidCharacter(TCHAR c)
 {
-	return (_istalnum(c) || c == _T('%')) || c == '/';
+	return (_istalnum(c) || c == _T('%')) || c == '/' || c == '.';
 }
 
 static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
