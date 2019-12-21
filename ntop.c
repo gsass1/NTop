@@ -28,6 +28,7 @@
 #include "ntop.h"
 #include "util.h"
 #include "vi.h"
+#include "pdh.h"
 
 #ifndef NTOP_VER
 #define NTOP_VER "dev"
@@ -47,7 +48,7 @@ static int OldWidth;
 static int OldHeight;
 static int SizeX;
 static int SizeY;
-static const int ProcessWindowPosY = 6;
+static int ProcessWindowPosY = 6;
 static DWORD ProcessWindowHeight;
 static DWORD VisibleProcessCount;
 static WORD SavedAttributes;
@@ -321,6 +322,7 @@ static process_sort_type ProcessSortType = SORT_BY_ID;
 static TCHAR OSName[256];
 static DWORD CPUCoreCount;
 static double CPUUsage;
+static cpu_counters CC;
 
 static ULONGLONG SubtractTimes(const FILETIME *A, const FILETIME *B)
 {
@@ -750,6 +752,8 @@ static void PollProcessList(DWORD UpdateTime)
 		CPUUsage = min(Percentage, 1.0);
 	}
 
+    CC = GetCPUUsage();
+
 	EnterCriticalSection(&SyncLock);
 
 	memcpy(ProcessList, NewProcessList, NewProcessCount * sizeof *ProcessList);
@@ -950,7 +954,7 @@ static void DrawOptions(const options_column *Columns, int Count)
 	}
 }
 
-#define BAR_WIDTH 25
+//#define BAR_WIDTH 50
 
 static int DrawPercentageBar(TCHAR *Name, double Percentage, WORD Color)
 {
@@ -961,6 +965,9 @@ static int DrawPercentageBar(TCHAR *Name, double Percentage, WORD Color)
 	SetColor(Config.FGColor);
 	ConPutc('[');
 	CharsWritten++;
+
+    //double BAR_WIDTH = (double)Width * 0.2;
+    int BAR_WIDTH = Width/3;
 
 	int Bars = (int)((double)BAR_WIDTH * Percentage);
 	SetColor(Color);
@@ -974,7 +981,7 @@ static int DrawPercentageBar(TCHAR *Name, double Percentage, WORD Color)
 	}
 	CharsWritten += BAR_WIDTH - Bars;
 	SetColor(Config.BGColor);
-	CharsWritten += ConPrintf(_T("%04.1f%%"), 100.0 * Percentage);
+	CharsWritten += ConPrintf(_T("%5.1f%%"), 100.0 * Percentage);
 	SetColor(Config.FGColor);
 	ConPutc(']');
 	CharsWritten++;
@@ -1595,6 +1602,7 @@ int _tmain(int argc, TCHAR *argv[])
 	ViMessage = xcalloc(DEFAULT_STR_SIZE, 1);
 	ViInit();
 
+    InitPDH();
 	PollConsoleInfo();
 	PollInitialSystemInfo();
 	PollSystemInfo();
@@ -1629,44 +1637,65 @@ int _tmain(int argc, TCHAR *argv[])
 		SetColor(Config.FGColor);
 		WriteBlankLine();
 
-		/* CPU */
-		int CharsWritten = 0;
+        /* CPU */
+        int CharsWritten = 0;
+        int Half = CC.nCPU/2;
+        for(int i = 0; i < CC.nCPU/2; ++i) {
+            TCHAR CoreDesc[256];
+            wsprintf(CoreDesc, _T("%3d"), i);
 
-		CharsWritten += DrawPercentageBar(_T("CPU"), CPUUsage, Config.CPUBarColor);
+            CharsWritten += DrawPercentageBar(CoreDesc, CC.usage[i], Config.CPUBarColor);
 
-		int CPUInfoChars = 0;
+            ConPutc(' ');
+            ++CharsWritten;
 
-		TCHAR CPUNameBuf[] = _T("  Name: ");
-		CPUInfoChars += _tcslen(CPUNameBuf);
+            wsprintf(CoreDesc, _T("%3d"), i+Half);
+            CharsWritten += DrawPercentageBar(CoreDesc, CC.usage[i+Half], Config.CPUBarColor);
 
-		TCHAR CPUInfoBuf[256];
-		CPUInfoChars += wsprintf(CPUInfoBuf, _T("%s (%u Cores)"), CPUName, CPUCoreCount);
+            for(; CharsWritten < Width; CharsWritten++) {
+                ConPutc(' ');
+            }
+            CharsWritten = 0;
 
-		int TaskInfoChars = 0;
+        }
 
-		TCHAR TasksNameBuf[] = _T("  Tasks: ");
-		TaskInfoChars += _tcsclen(TasksNameBuf);
+        ProcessWindowPosY = 9;
 
-		TCHAR TasksInfoBuf[256];
-		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u total, %u running"), ProcessCount, RunningProcessCount);
+        CharsWritten = 0;
 
-		if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) {
-			SetColor(Config.FGHighlightColor);
-			ConPrintf(_T("%s"), CPUNameBuf);
-			SetColor(Config.FGColor);
-			ConPrintf(_T("%s"), CPUInfoBuf);
-			CharsWritten += CPUInfoChars;
-		}
+/* 		int CPUInfoChars = 0; */
 
-		SetColor(Config.FGHighlightColor);
-		ConPrintf(_T("%s"), TasksNameBuf);
-		SetColor(Config.FGColor);
-		ConPrintf(_T("%s"), TasksInfoBuf);
-		CharsWritten += TaskInfoChars;
+/* 		TCHAR CPUNameBuf[] = _T("  Name: "); */
+/* 		CPUInfoChars += _tcslen(CPUNameBuf); */
 
-		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(' ');
-		}
+/* 		TCHAR CPUInfoBuf[256]; */
+/* 		CPUInfoChars += wsprintf(CPUInfoBuf, _T("%s (%u Cores)"), CPUName, CPUCoreCount); */
+
+/* 		int TaskInfoChars = 0; */
+
+/* 		TCHAR TasksNameBuf[] = _T("  Tasks: "); */
+/* 		TaskInfoChars += _tcsclen(TasksNameBuf); */
+
+/* 		TCHAR TasksInfoBuf[256]; */
+/* 		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u total, %u running"), ProcessCount, RunningProcessCount); */
+
+/* 		if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) { */
+/* 			SetColor(Config.FGHighlightColor); */
+/* 			ConPrintf(_T("%s"), CPUNameBuf); */
+/* 			SetColor(Config.FGColor); */
+/* 			ConPrintf(_T("%s"), CPUInfoBuf); */
+/* 			CharsWritten += CPUInfoChars; */
+/* 		} */
+
+/* 		SetColor(Config.FGHighlightColor); */
+/* 		ConPrintf(_T("%s"), TasksNameBuf); */
+/* 		SetColor(Config.FGColor); */
+/* 		ConPrintf(_T("%s"), TasksInfoBuf); */
+/* 		CharsWritten += TaskInfoChars; */
+
+/* 		for(; CharsWritten < Width; CharsWritten++) { */
+/* 			ConPutc(' '); */
+/* 		} */
 
 		/* Memory */
 		CharsWritten = DrawPercentageBar(_T("Mem"), UsedMemoryPerc, Config.MemoryBarColor);
