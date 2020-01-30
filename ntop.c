@@ -1701,11 +1701,11 @@ int _tmain(int argc, TCHAR *argv[])
 		VisibleProcessCount = ProcessWindowHeight - 2;
 
 		const process_list_column ProcessListColumns[] = {
-			{ _T("ID"),	6 },
+			{ _T("ID"),	7 },
 			{ _T("USER"),	9 },
 			{ _T("PRI"),	3 },
 			{ _T("CPU%"),	5 },
-			{ _T("MEM"),	9 },
+			{ _T("MEM"),	11 },
 			{ _T("THRD"),	4 },
 			{ _T("DISK"),	9 },
 			{ _T("TIME"),	TIME_STR_SIZE - 1 },
