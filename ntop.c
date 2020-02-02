@@ -1214,6 +1214,9 @@ static void PrintHelp(const TCHAR *argv0)
 				) },
 		{ _T("n"), _T("Next in search.") },
 		{ _T("N"), _T("Previous in search.") },
+		{ _T("F10, q"), _T("Quit") },
+		{ _T("M"), _T("Sort by memory usage") },
+		{ _T("P"), _T("Sort by processor usage") },
 	};
 	PrintHelpEntries(_T("INTERACTIVE COMMANDS"), _countof(InteractiveCommands), InteractiveCommands);
 
@@ -1419,6 +1422,8 @@ static void ProcessInput(BOOL *Redraw)
 							*Redraw = TRUE;
 						}
 						break;
+					case VK_F10:
+						exit(EXIT_SUCCESS);  // Top compatibility
 					default:
 						switch(InputRecord.Event.KeyEvent.uChar.AsciiChar) {
 						case 'K':
@@ -1478,11 +1483,17 @@ static void ProcessInput(BOOL *Redraw)
 						case 'k':
 							DoScroll(SCROLL_UP, Redraw);
 							break;
-						case 'q':
-						case 'Q':
-							SetViMessage(VI_NOTICE, "To exit, type :q");
+						// Top compatibility keys:
+						case 'M':
+							ChangeProcessSortType(SORT_BY_USED_MEMORY);
 							*Redraw = TRUE;
 							break;
+						case 'P':
+							ChangeProcessSortType(SORT_BY_PROCESSOR_TIME);
+							*Redraw = TRUE;
+							break;
+						case 'q':
+							exit(EXIT_SUCCESS);
 						}
 						break;
 					}
