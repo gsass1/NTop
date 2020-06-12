@@ -37,7 +37,6 @@
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
 #define SCROLL_INTERVAL 20ULL
-#define REDRAW_INTERVAL 1000ULL
 #define INPUT_LOOP_DELAY 30
 #define CARET_INTERVAL 500
 
@@ -92,6 +91,7 @@ typedef struct config {
 	WORD MemoryBarColor;
 	WORD PageMemoryBarColor;
 	WORD ErrorColor;
+	ULONGLONG RedrawInterval;
 } config;
 
 static config Config = {
@@ -106,6 +106,7 @@ static config Config = {
 	FOREGROUND_GREEN,
 	FOREGROUND_GREEN,
 	BACKGROUND_RED | FOREGROUND_WHITE,
+	1000
 };
 
 static config MonochromeConfig = {
@@ -119,6 +120,7 @@ static config MonochromeConfig = {
 	FOREGROUND_WHITE,
 	FOREGROUND_WHITE,
 	BACKGROUND_WHITE,
+	1000
 };
 
 static void ParseConfigLine(char *Line)
@@ -156,6 +158,8 @@ static void ParseConfigLine(char *Line)
 		Config.PageMemoryBarColor = Num;
 	} else if(_strcmpi(Key, "ErrorColor") == 0) {
 		Config.ErrorColor = Num;
+	} else if(_strcmpi(Key, "RedrawInterval") == 0) {
+		Config.RedrawInterval = (ULONGLONG)Num;
 	}
 }
 
@@ -175,7 +179,7 @@ static void ReadConfigFile(void)
 	char *Buffer = xmalloc(BUF_INCREASE);
 
 	while(1) {
-		if(!fgets(Offset + Buffer, BufferSize - Offset, File)) {
+		if(!fgets(Offset + Buffer, (int)(BufferSize - Offset), File)) {
 			break;
 		}
 
@@ -608,7 +612,7 @@ static void PollProcessList(DWORD UpdateTime)
 		if(Process.Handle) {
 			PROCESS_MEMORY_COUNTERS ProcMemCounters;
 			if(GetProcessMemoryInfo(Process.Handle, &ProcMemCounters, sizeof(ProcMemCounters))) {
-				Process.UsedMemory = ProcMemCounters.WorkingSetSize;
+				Process.UsedMemory = (DWORD)ProcMemCounters.WorkingSetSize;
 			}
 
 			HANDLE ProcessTokenHandle;
@@ -1648,16 +1652,16 @@ int _tmain(int argc, TCHAR *argv[])
 		int CPUInfoChars = 0;
 
 		TCHAR CPUNameBuf[] = _T("  Name: ");
-		CPUInfoChars += _tcslen(CPUNameBuf);
 
+		CPUInfoChars += (int)_tcslen(CPUNameBuf);
 		TCHAR CPUInfoBuf[256];
 		CPUInfoChars += wsprintf(CPUInfoBuf, _T("%s (%u Cores)"), CPUName, CPUCoreCount);
 
 		int TaskInfoChars = 0;
 
 		TCHAR TasksNameBuf[] = _T("  Tasks: ");
-		TaskInfoChars += _tcsclen(TasksNameBuf);
 
+		TaskInfoChars += (int)_tcsclen(TasksNameBuf);
 		TCHAR TasksInfoBuf[256];
 		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u total, %u running"), ProcessCount, RunningProcessCount);
 
@@ -1817,7 +1821,7 @@ int _tmain(int argc, TCHAR *argv[])
 
 			ULONGLONG Now = GetTickCount64();
 
-			if(Now - StartTicks >= REDRAW_INTERVAL) {
+			if(Now - StartTicks >= Config.RedrawInterval) {
 				PollSystemInfo();
 				StartTicks = Now;
 				break;
