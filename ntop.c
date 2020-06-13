@@ -1827,11 +1827,15 @@ int _tmain(int argc, TCHAR *argv[])
 				break;
 			}
 
+            /* FIXME: ignore redrawing the caret for now because we can't do it without redrawing the entire screen yet. */
+
+            /*
 			if(Now - CaretTicks >= CARET_INTERVAL) {
 				CaretTicks = Now;
 				CaretState = !CaretState;
 				break;
 			}
+            */
 
 			Sleep(INPUT_LOOP_DELAY);
 		}
