@@ -298,7 +298,8 @@ typedef int (*process_sort_fn_t)(const void *, const void *);
 #define SORT_PROCESS_BY_INTEGER(Attribute)							\
 static int SortProcessBy##Attribute(const void *A, const void *B)				\
 {												\
-	int Compare = (int)(((const process *)A)->Attribute - ((const process *)B)->Attribute); \
+	int Compare = (((const process *)A)->Attribute > ((const process *)B)->Attribute) - \
+					(((const process *)A)->Attribute < ((const process *)B)->Attribute); \
 	return (SortOrder == ASCENDING) ? Compare : -Compare;					\
 }												\
 
