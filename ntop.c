@@ -302,6 +302,15 @@ static int SortProcessBy##Attribute(const void *A, const void *B)				\
 	return (SortOrder == ASCENDING) ? Compare : -Compare;					\
 }												\
 
+#define SORT_PROCESS_BY_DOUBLE(Attribute)                                               \
+static int SortProcessBy##Attribute(const void *A, const void *B)                       \
+{												                                        \
+	double Diff = (((const process *)A)->Attribute - ((const process *)B)->Attribute);  \
+	if (Diff > 0.0) return (SortOrder == ASCENDING) ? 1 : -1;                      		\
+	if (Diff < 0.0) return (SortOrder == ASCENDING) ? -1 : 1;                           \
+	return 0;                                                                           \
+}												                                        \
+
 #define SORT_PROCESS_BY_STRING(Attribute, MaxLength)								\
 static int SortProcessBy##Attribute(const void *A, const void *B)						\
 {														\
@@ -310,7 +319,7 @@ static int SortProcessBy##Attribute(const void *A, const void *B)						\
 }														\
 
 SORT_PROCESS_BY_INTEGER(ID);
-SORT_PROCESS_BY_INTEGER(PercentProcessorTime);
+SORT_PROCESS_BY_DOUBLE(PercentProcessorTime);
 SORT_PROCESS_BY_INTEGER(UsedMemory);
 SORT_PROCESS_BY_INTEGER(UpTime);
 SORT_PROCESS_BY_INTEGER(BasePriority);
