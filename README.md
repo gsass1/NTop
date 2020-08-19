@@ -9,9 +9,15 @@ htop-like system-monitor with Vi-emulation for Windows. Because using Task Manag
 
 NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 
-## Installation with Chocolatey
+## Installation
+
+### Chocolatey
 
 `choco install ntop.portable`
+
+### Scoop
+
+With extras bucket: `scoop install ntop`
 
 ## Usage
 
