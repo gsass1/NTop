@@ -1778,8 +1778,7 @@ int _tmain(int argc, TCHAR *argv[])
 		} else if(ViMessageActive()) {
 			WriteVi();
 		} else {
-			ConPutc('\n');
-			WriteBlankLine();
+			ConPrintf(_T("\n%*c"), Width - 1, ' ');
 		}
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
 
