@@ -1767,6 +1767,10 @@ int _tmain(int argc, TCHAR *argv[])
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|DISABLE_NEWLINE_AUTO_RETURN);
 		if (InInputMode) {
 			CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
+			if (CaretState) {
+				ConPutc('_');
+				++CharsWritten;
+			}
 
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(' ');
