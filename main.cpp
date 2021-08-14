@@ -54,7 +54,7 @@ int main()
 
         // Obtain queried object count (using empty buffer for result storage)
         winrt::check_hresult(refresher->Refresh(0L));
-        ULONG logical_core_count = [&]() // IILE
+        ULONG processor_enum_count = [&]() // IILE
             {
                 ULONG count;
                 auto hresult = enumerator->GetObjects(
@@ -70,27 +70,29 @@ int main()
             }();
 
         // Obtain and remember property handles
-        CIMTYPE percent_processor_time_handle = [&]() // IILE
-            {
-                std::vector<winrt::com_ptr<IWbemObjectAccess>> enum_accessors(logical_core_count);
-                ULONG count;
-                winrt::check_hresult(enumerator->GetObjects(
-                    0L,
-                    logical_core_count,
-                    reinterpret_cast<IWbemObjectAccess**>(enum_accessors.data()),
-                    &count));
+        auto obtain_property_handle = [&](const wchar_t* property_name)
+        {
+            std::vector<winrt::com_ptr<IWbemObjectAccess>> enum_accessors(processor_enum_count);
+            ULONG count;
+            winrt::check_hresult(enumerator->GetObjects(
+                0L,
+                processor_enum_count,
+                reinterpret_cast<IWbemObjectAccess**>(enum_accessors.data()),
+                &count));
 
-                CIMTYPE handle, type;
-                winrt::check_hresult(enum_accessors[0]->GetPropertyHandle(
-                    L"PercentProcessorTime",
-                    &type,
-                    &handle));
+            CIMTYPE handle, type;
+            winrt::check_hresult(enum_accessors[0]->GetPropertyHandle(
+                property_name,
+                &type,
+                &handle));
 
-                return handle;
-            }();
+            return handle;
+        };
+        CIMTYPE percent_user_time_handle = obtain_property_handle(L"PercentUserTime"),
+                percent_privileged_time_handle = obtain_property_handle(L"PercentPrivilegedTime"),
+                percent_processor_time_handle = obtain_property_handle(L"PercentProcessorTime");
 
-        std::vector<winrt::com_ptr<IWbemObjectAccess>> enum_accessors(logical_core_count);
-        std::uint64_t percent_processor_time;
+        std::vector<winrt::com_ptr<IWbemObjectAccess>> enum_accessors(processor_enum_count);
         for(int I = 0 ; I < 10 ; ++I)
         {
             winrt::check_hresult(refresher->Refresh(0L));
@@ -104,16 +106,26 @@ int main()
                 &count));
 
             // Loop over core loads. (Last entry seems to be an avarage of all cores.)
-            for (size_t i = 0 ; i < enum_accessors.size() - 1 ; ++i)
+            for (size_t i = 0 ; i < std::thread::hardware_concurrency() ; ++i)
             {
-                long bytes_read;
-                winrt::check_hresult(enum_accessors[i]->ReadPropertyValue(
-                    percent_processor_time_handle,
-                    sizeof(std::uint64_t),
-                    &bytes_read,
-                    reinterpret_cast<byte*>(&percent_processor_time)));
+                auto read_uint64_t_property = [&](long handle)
+                {
+                    long bytes_read;
+                    std::uint64_t result;
+                    winrt::check_hresult(enum_accessors[i]->ReadPropertyValue(
+                        handle,
+                        sizeof(std::uint64_t),
+                        &bytes_read,
+                        reinterpret_cast<byte*>(&result)));
 
-                std::cout << percent_processor_time << std::endl;
+                    return result;
+                };
+
+                std::cout <<
+                    read_uint64_t_property(percent_user_time_handle) << "\t" <<
+                    read_uint64_t_property(percent_privileged_time_handle) << "\t" <<
+                    read_uint64_t_property(percent_processor_time_handle) << "\t" <<
+                    std::endl;
             }
 
             std::cout << std::endl;
