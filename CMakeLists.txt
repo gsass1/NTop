@@ -76,8 +76,3 @@ target_compile_features(test
   PRIVATE
     cxx_std_17
 )
-
-# Temporary fix for C++/WinRT bug
-target_compile_options(test
-  PRIVATE /permissive
-)
