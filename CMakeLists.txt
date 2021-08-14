@@ -60,3 +60,24 @@ target_compile_features(wmi
 target_compile_options(wmi
   PRIVATE /permissive
 )
+
+add_executable(test
+  main.cpp
+)
+
+target_link_libraries(test
+  PRIVATE
+    WindowsApp
+    wbemuuid
+    WIL::WIL
+)
+
+target_compile_features(test
+  PRIVATE
+    cxx_std_17
+)
+
+# Temporary fix for C++/WinRT bug
+target_compile_options(test
+  PRIVATE /permissive
+)
