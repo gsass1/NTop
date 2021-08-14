@@ -80,7 +80,8 @@ int main()
                 reinterpret_cast<IWbemObjectAccess**>(enum_accessors.data()),
                 &count));
 
-            CIMTYPE handle, type;
+            CIMTYPE type;
+            long handle;
             winrt::check_hresult(enum_accessors[0]->GetPropertyHandle(
                 property_name,
                 &type,
@@ -88,9 +89,9 @@ int main()
 
             return handle;
         };
-        CIMTYPE percent_user_time_handle = obtain_property_handle(L"PercentUserTime"),
-                percent_privileged_time_handle = obtain_property_handle(L"PercentPrivilegedTime"),
-                percent_processor_time_handle = obtain_property_handle(L"PercentProcessorTime");
+        long percent_user_time_handle = obtain_property_handle(L"PercentUserTime"),
+             percent_privileged_time_handle = obtain_property_handle(L"PercentPrivilegedTime"),
+             percent_processor_time_handle = obtain_property_handle(L"PercentProcessorTime");
 
         std::vector<winrt::com_ptr<IWbemObjectAccess>> enum_accessors(processor_enum_count);
         for(int I = 0 ; I < 10 ; ++I)
