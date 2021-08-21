@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <metadata>
-    <id>NTop.Portable</id>
+    <id>ntop.portable</id>
     <title>NTop</title>
     <version>0.3.2</version>
     <authors>Gian Sass</authors>
