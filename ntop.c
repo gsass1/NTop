@@ -44,8 +44,6 @@ static int Width;
 static int Height;
 static int OldWidth;
 static int OldHeight;
-static int SizeX;
-static int SizeY;
 static const int ProcessWindowPosY = 6;
 static DWORD ProcessWindowHeight;
 static DWORD VisibleProcessCount;
@@ -811,9 +809,6 @@ static BOOL PollConsoleInfo(void)
 		return TRUE;
 	}
 
-	SizeX = (int)Csbi.dwSize.X;
-	SizeY = (int)Csbi.dwSize.Y;
-
 	if(SavedAttributes == 0)
 		SavedAttributes = Csbi.wAttributes;
 
@@ -993,6 +988,49 @@ static int DrawPercentageBar(TCHAR *Name, double Percentage, WORD Color)
 	CharsWritten++;
 	return CharsWritten;
 }
+
+static int LogicalCoreBardWidth;
+
+// Used to calculate the number of bars that should be drawn.
+// NOTE: This may not be the maximum of numbers to be drawn, as
+//       the percentage indicator overlays on top of the bars.
+static int CalculateLogicalCoreBarWidth(const int ConsoleWidth)
+{
+	// ConsoleWidth - Left&Right Margin - BarCount * (CoreNumLabel + [])
+	return ConsoleWidth - 4 - 4*(3 + 2);
+}
+
+static int LogicalCoreCount;
+static int* LogicalCoreLoads;
+
+static int DrawLogicalCoresPercentageBars()
+{/*
+	int CharsWritten = 0;
+
+	SetColor(Config.FGHighlightColor);
+	CharsWritten += ConPrintf(_T("  %s"), Name);
+	SetColor(Config.FGColor);
+	ConPutc('[');
+	CharsWritten++;
+
+	int Bars = (int)((double)BAR_WIDTH * Percentage);
+	SetColor(Color);
+	for(int i = 0; i < Bars; i++) {
+		ConPutc('|');
+	}
+	CharsWritten+= Bars;
+	SetColor(Config.FGColor);
+	for(int i = 0; i < BAR_WIDTH - Bars; i++) {
+		ConPutc(' ');
+	}
+	CharsWritten += BAR_WIDTH - Bars;
+	SetColor(Config.BGColor);
+	CharsWritten += ConPrintf(_T("%04.1f%%"), 100.0 * Percentage);
+	SetColor(Config.FGColor);
+	ConPutc(']');
+	CharsWritten++;
+	return CharsWritten;
+*/}
 
 static void RestoreConsole(void)
 {
