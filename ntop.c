@@ -221,7 +221,7 @@ typedef struct process {
 	TCHAR UserName[UNLEN];
 	DWORD BasePriority;
 	double PercentProcessorTime;
-	DWORD UsedMemory;
+	unsigned __int64 UsedMemory;
 	DWORD ThreadCount;
 	ULONGLONG UpTime;
 	TCHAR ExeName[MAX_PATH];
@@ -621,7 +621,7 @@ static void PollProcessList(DWORD UpdateTime)
 		if(Process.Handle) {
 			PROCESS_MEMORY_COUNTERS ProcMemCounters;
 			if(GetProcessMemoryInfo(Process.Handle, &ProcMemCounters, sizeof(ProcMemCounters))) {
-				Process.UsedMemory = (DWORD)ProcMemCounters.WorkingSetSize;
+				Process.UsedMemory = (unsigned __int64)ProcMemCounters.WorkingSetSize;
 			}
 
 			HANDLE ProcessTokenHandle;
