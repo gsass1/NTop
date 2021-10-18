@@ -302,6 +302,14 @@ static int SortProcessBy##Attribute(const void *A, const void *B)				\
 	return (SortOrder == ASCENDING) ? Compare : -Compare;					\
 }												\
 
+#define SORT_PROCESS_BY_UINT64(Attribute)							\
+static int SortProcessBy##Attribute(const void *A, const void *B)				\
+{												\
+	__int64 Compare = (__int64)(((const process *)A)->Attribute - ((const process *)B)->Attribute); \
+	int Result = (Compare > 1) ? 1 : -1; 							\
+	return (SortOrder == ASCENDING) ? Result : -Result;					\
+}												\
+
 #define SORT_PROCESS_BY_DOUBLE(Attribute)                                               \
 static int SortProcessBy##Attribute(const void *A, const void *B)                       \
 {												                                        \
@@ -320,7 +328,7 @@ static int SortProcessBy##Attribute(const void *A, const void *B)						\
 
 SORT_PROCESS_BY_INTEGER(ID);
 SORT_PROCESS_BY_DOUBLE(PercentProcessorTime);
-SORT_PROCESS_BY_INTEGER(UsedMemory);
+SORT_PROCESS_BY_UINT64(UsedMemory);
 SORT_PROCESS_BY_INTEGER(UpTime);
 SORT_PROCESS_BY_INTEGER(BasePriority);
 SORT_PROCESS_BY_INTEGER(ThreadCount);
@@ -910,6 +918,28 @@ static void FormatTimeString(TCHAR *Buffer, ULONGLONG MS)
 	wsprintf(Buffer, _T("%02d:%02d:%02d:%02d"), Days, Hours, Minutes, Seconds);
 }
 
+static void FormatMemoryString(TCHAR *Buffer, DWORD BufferSize, unsigned __int64 Memory)
+{
+	double Value;
+	TCHAR Unit[255];
+
+	if (Memory < 1000ULL*1000) {
+		Value = Memory / 1000.0;
+		_tcscpy_s(Unit, _countof(Unit), _T("KB"));
+	} else if (Memory < 1000ULL*1000*1000) {
+		Value = Memory / (1000*1000.0);
+		_tcscpy_s(Unit, _countof(Unit), _T("MB"));
+	} else if (Memory < 1000ULL*1000*1000*1000) {
+		Value = Memory / (1000*1000*1000.0);
+		_tcscpy_s(Unit, _countof(Unit), _T("GB"));
+	} else {
+		Value = Memory / (1000*1000*1000*1000.0);
+		_tcscpy_s(Unit, _countof(Unit), _T("TB"));
+	}
+
+	sprintf_s(Buffer, BufferSize, _T("% 8.1f %s"), Value, Unit);
+}
+
 static void WriteBlankLine(void)
 {
 	ConPrintf(_T("%*c"), Width, ' ');
@@ -1018,6 +1048,9 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 	TCHAR UpTimeStr[TIME_STR_SIZE];
 	FormatTimeString(UpTimeStr, Process->UpTime);
 
+	TCHAR MemoryStr[256];
+	FormatMemoryString(MemoryStr, _countof(MemoryStr), Process->UsedMemory);
+
 	if(ProcessSortType == SORT_BY_TREE) {
 		TCHAR OffsetStr[256] = { 0 };
 		if(Process->TreeDepth > 0) {
@@ -1027,12 +1060,12 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 			_tcscat_s(OffsetStr, _countof(OffsetStr), _T("`- "));
 		}
 
-		CharsWritten = ConPrintf(_T("\n%7u  %9s  %3u  %04.1f%%  % 8.1f MB  %4u  % 03.1f MB/s  %s"),
+		CharsWritten = ConPrintf(_T("\n%7u  %9s  %3u  %04.1f%%  %s  %4u  % 03.1f MB/s  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
 				Process->PercentProcessorTime,
-				(double)Process->UsedMemory / 1000000.0,
+				MemoryStr,
 				Process->ThreadCount,
 				ceil((double)Process->DiskUsage / 1000000.0 * 10.0) / 10.0,
 				UpTimeStr
@@ -1048,12 +1081,12 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 
 		CharsWritten += ConPrintf(_T("%s"), Process->ExeName);
 	} else {
-		CharsWritten = ConPrintf(_T("\n%7u  %9s  %3u  %04.1f%%  % 8.1f MB  %4u  % 03.1f MB/s  %s  %s"),
+		CharsWritten = ConPrintf(_T("\n%7u  %9s  %3u  %04.1f%%  %s  %4u  % 03.1f MB/s  %s  %s"),
 				Process->ID,
 				Process->UserName,
 				Process->BasePriority,
 				Process->PercentProcessorTime,
-				(double)Process->UsedMemory / 1000000.0,
+				MemoryStr,
 				Process->ThreadCount,
 				ceil((double)Process->DiskUsage / 1000000.0 * 10.0) / 10.0,
 				UpTimeStr,
