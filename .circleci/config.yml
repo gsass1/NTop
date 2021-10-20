@@ -16,7 +16,9 @@ jobs:
       - checkout
       - run:
           name: Compiling Code
-          command: '.\build.bat'
+          command: '.\build.bat -release'
+      - store_artifacts:
+          path: 'build\ntop.exe'
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
