@@ -230,6 +230,10 @@ typedef struct process {
 	ULONGLONG DiskOperations;
 	DWORD DiskUsage;
 	DWORD TreeDepth;
+
+	struct process *Next;
+	struct process *Parent;
+	struct process *FirstChild;
 } process;
 
 #define PROCLIST_BUF_INCREASE 64
@@ -356,6 +360,37 @@ static ULONGLONG SubtractTimes(const FILETIME *A, const FILETIME *B)
 	return lA.QuadPart - lB.QuadPart;
 }
 
+void AddChildProcess(process *ParentProcess, process *Process)
+{
+	if(ParentProcess == Process) return;
+
+	if (ParentProcess->FirstChild == NULL) {
+		ParentProcess->FirstChild = Process;
+	} else {
+		process *ChildProcess = ParentProcess->FirstChild;
+		while (ChildProcess->Next != NULL) {
+			ChildProcess = ChildProcess->Next;
+			if(ChildProcess == Process) return;
+		}
+		ChildProcess->Next = Process;
+	}
+
+	Process->Parent = ParentProcess;
+}
+
+void ProcessTreeToList(process *RootProcess, process *Dest, int *Index)
+{
+	process *ProcessNode = RootProcess->FirstChild;
+	if(ProcessNode == NULL) return;
+
+	while(ProcessNode != NULL) {
+		Dest[*Index] = *ProcessNode;
+		*Index = *Index + 1;
+		ProcessTreeToList(ProcessNode, Dest, Index);
+		ProcessNode = ProcessNode->Next;
+	}
+}
+
 static void SortProcessList(void)
 {
 	if(ProcessSortType != SORT_BY_TREE)
@@ -399,92 +434,47 @@ static void SortProcessList(void)
 		SortOrder = ASCENDING;
 		qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortProcessByParentPID);
 
+		process RootProcess = { 0 };
+
+		/* Find and assign parent and child processes that have ParentPID=0 */
 		for(DWORD i = 0; i < ProcessCount; i++) {
 			ProcessList[i].TreeDepth = 0;
+
+			if (ProcessList[i].ParentPID == 0) {
+				AddChildProcess(&RootProcess, &ProcessList[i]);
+			}
 		}
 
+		/* Find and assign parent and child processes */
 		for(DWORD i = 0; i < ProcessCount; i++) {
-			DWORD ID = ProcessList[i].ID;
-			DWORD Start = 0;
-			DWORD End = 0;
+			for(DWORD j = 0; j < ProcessCount; j++) {
+				if(i == j) continue;
 
-			for(DWORD j = i + 1; j < ProcessCount; j++) {
-				if(ProcessList[j].ParentPID == ID) {
-					Start = j;
-					while(++j < ProcessCount && ProcessList[j].ParentPID == ID)
-						;
-					End = j;
-					break;
-				}
-
-				if(Start != 0)
-					break;
-			}
-
-			if(Start != 0) {
-				DWORD Size = End - Start;
-
-				/* We want to insert the process group right after this process, thus i+1 */
-				DWORD InsLoc = i + 1;
-
-				/* We have to move all processes that come after i by Size items */
-				DWORD TmpLoc = InsLoc + Size;
-
-				if(Start == InsLoc)
-					/* Process group is already right where we want it to be */
-					goto Next;
-
-
-				/* Make sure process list size has enough left-over to move the data to */
-				while(ProcessCount+Size > ProcessListSize) {
-					IncreaseProcListSize();
-				}
-
-				/* Move all processes */
-				for(DWORD j = ProcessCount+Size-1; j >= TmpLoc && j != 0; j--) {
-					ProcessList[j] = ProcessList[j-Size];
-				}
-
-#ifdef DEBUG_TREESORT
-				/* Memory at InsLoc->InsLoc+Size and TmpLoc+Size should be identical now */
-				for(DWORD j = InsLoc; j < TmpLoc; j++) {
-					assert(ProcessList[j].ID == ProcessList[j+Size].ID);
-				}
-#endif
-
-				/* Copy process group in */
-				for(DWORD j = 0; j < Size; j++) {
-					ProcessList[j+InsLoc] = ProcessList[Size+Start+j];
-				}
-
-				/* Fill gap at Start -> End */
-				for(DWORD j = Start+Size; j < ProcessCount; j++) {
-					ProcessList[j] = ProcessList[j+Size];
-				}
-
-#ifdef DEBUG_TREESORT
-				/* Check no mistakes */
-				for(DWORD j = 0; j < Size-1; j++) {
-					assert(ProcessList[j+InsLoc].ParentPID == ID);
-				}
-
-				/* Check no dups */
-				for(DWORD j = 0; j < ProcessCount; j++) {
-					for(DWORD k = 0; k < ProcessCount; k++) {
-						if(j != k) {
-							assert(ProcessList[j].ID != ProcessList[k].ID);
-						}
-					}
-				}
-#endif
-
-Next:
-				/* Set tree depth */
-				for(DWORD j = 0; j < Size; j++) {
-					ProcessList[j+InsLoc].TreeDepth = ProcessList[i].TreeDepth+1;
+				if(ProcessList[j].ParentPID == ProcessList[i].ID && ProcessList[j].ParentPID != 0) {
+					/* i is a parent of j */
+					AddChildProcess(&ProcessList[i], &ProcessList[j]);
+					ProcessList[j].TreeDepth = ProcessList[i].TreeDepth + 1;
 				}
 			}
 		}
+
+		/* Add processes with PIDs that couldn't be found to RootProcess or else
+		 * they won't be shown */
+		for(DWORD i = 0; i < ProcessCount; i++) {
+			process *Process = &ProcessList[i];
+
+			if(Process->ParentPID != 0 && Process->Parent == NULL) {
+				AddChildProcess(&RootProcess, Process);
+			}
+		}
+
+		process *TreeProcessList = xmalloc(ProcessCount * sizeof(*ProcessList));
+		int Index = 0;
+		ProcessTreeToList(&RootProcess, TreeProcessList, &Index);
+
+		memcpy(ProcessList, TreeProcessList, ProcessCount * sizeof(*ProcessList));
+
+		free(TreeProcessList);
 	}
 }
 
