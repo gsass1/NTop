@@ -378,9 +378,61 @@ void AddChildProcess(process *ParentProcess, process *Process)
 	Process->Parent = ParentProcess;
 }
 
-void ProcessTreeToList(process *RootProcess, process *Dest, int *Index)
+/* The "root" process which does not actually exist, acts as process tree root */
+static process RootProcess;
+
+/* Finds and assigns parent and child processes */
+void FindParentChildProcesses(void)
 {
-	process *ProcessNode = RootProcess->FirstChild;
+	memset(&RootProcess, 0, sizeof(RootProcess));
+
+	/* Find and assign parent and child processes that have ParentPID=0 */
+	for (DWORD i = 0; i < ProcessCount; i++)
+	{
+		ProcessList[i].TreeDepth = 0;
+		ProcessList[i].Next = 0;
+		ProcessList[i].Parent = 0;
+		ProcessList[i].FirstChild = 0;
+
+		// if (ProcessList[i].ParentPID == 0)
+		// {
+		// 	AddChildProcess(&RootProcess, &ProcessList[i]);
+		// }
+	}
+
+	/* Find and assign parent and child processes */
+	for (DWORD i = 0; i < ProcessCount; i++)
+	{
+		for (DWORD j = 0; j < ProcessCount; j++)
+		{
+			if (i == j)
+				continue;
+
+			if (ProcessList[j].ParentPID == ProcessList[i].ID && ProcessList[j].ParentPID != 0 && ProcessList[i].ID != ProcessList[j].ID && ProcessList[j].Next == NULL)
+			{
+				/* i is a parent of j */
+				AddChildProcess(&ProcessList[i], &ProcessList[j]);
+				ProcessList[j].TreeDepth = ProcessList[i].TreeDepth + 1;
+			}
+		}
+	}
+
+	/* Add processes with PIDs that couldn't be found to RootProcess or else
+		 * they won't be shown */
+	for (DWORD i = 0; i < ProcessCount; i++)
+	{
+		process *Process = &ProcessList[i];
+
+		if (Process->Parent == NULL)
+		{
+			AddChildProcess(&RootProcess, Process);
+		}
+	}
+}
+
+void ProcessTreeToList(process *Process, process *Dest, int *Index)
+{
+	process *ProcessNode = Process->FirstChild;
 	if(ProcessNode == NULL) return;
 
 	while(ProcessNode != NULL) {
@@ -430,48 +482,19 @@ static void SortProcessList(void)
 		if(SortFn) {
 			qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortFn);
 		}
+
+		FindParentChildProcesses();
 	} else {
 		SortOrder = ASCENDING;
 		qsort(ProcessList, ProcessCount, sizeof(*ProcessList), SortProcessByParentPID);
 
-		process RootProcess = { 0 };
-
-		/* Find and assign parent and child processes that have ParentPID=0 */
-		for(DWORD i = 0; i < ProcessCount; i++) {
-			ProcessList[i].TreeDepth = 0;
-
-			if (ProcessList[i].ParentPID == 0) {
-				AddChildProcess(&RootProcess, &ProcessList[i]);
-			}
-		}
-
-		/* Find and assign parent and child processes */
-		for(DWORD i = 0; i < ProcessCount; i++) {
-			for(DWORD j = 0; j < ProcessCount; j++) {
-				if(i == j) continue;
-
-				if(ProcessList[j].ParentPID == ProcessList[i].ID && ProcessList[j].ParentPID != 0) {
-					/* i is a parent of j */
-					AddChildProcess(&ProcessList[i], &ProcessList[j]);
-					ProcessList[j].TreeDepth = ProcessList[i].TreeDepth + 1;
-				}
-			}
-		}
-
-		/* Add processes with PIDs that couldn't be found to RootProcess or else
-		 * they won't be shown */
-		for(DWORD i = 0; i < ProcessCount; i++) {
-			process *Process = &ProcessList[i];
-
-			if(Process->ParentPID != 0 && Process->Parent == NULL) {
-				AddChildProcess(&RootProcess, Process);
-			}
-		}
+		FindParentChildProcesses();
 
 		process *TreeProcessList = xmalloc(ProcessCount * sizeof(*ProcessList));
 		int Index = 0;
 		ProcessTreeToList(&RootProcess, TreeProcessList, &Index);
 
+		ProcessCount = Index;
 		memcpy(ProcessList, TreeProcessList, ProcessCount * sizeof(*ProcessList));
 
 		free(TreeProcessList);
@@ -765,6 +788,8 @@ static void PollProcessList(DWORD UpdateTime)
 
 	memcpy(ProcessList, NewProcessList, NewProcessCount * sizeof *ProcessList);
 	ProcessCount = NewProcessCount;
+
+
 	SortProcessList();
 	ReadjustCursor();
 
