@@ -17,7 +17,7 @@ NTop as in Windows NT-op or NukeTop. Whatever you prefer (the latter obviously).
 
 ### Scoop
 
-With extras bucket: `scoop install ntop`
+`scoop install ntop`
 
 ## Usage
 
