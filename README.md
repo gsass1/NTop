@@ -58,7 +58,7 @@ $ scoop install ntop
 |:---|:---|
 | `:exec` CMD | Executes the given Windows command. |
 | `:kill` PID(s) | Kill all given processes. |
-| {`:q`|`:quit`} | Quit NTop. |
+| `:q`, `:quit` | Quit NTop. |
 | `/PATTERN`, `:search` PATTERN | Do a search. |
 | `:sort` COLUMN | Sort the process list after the given column. |
 | `:tree` | View process tree. |
