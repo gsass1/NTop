@@ -1779,7 +1779,7 @@ int _tmain(int argc, TCHAR *argv[])
 			{ _T("CPU%"),	5 },
 			{ _T("MEM"),	11 },
 			{ _T("THRD"),	4 },
-			{ _T("DISK"),	9 },
+			{ _T("DISK"),	11 },
 			{ _T("TIME"),	TIME_STR_SIZE - 1 },
 			{ _T("PROCESS"),	-1 },
 		};
