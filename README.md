@@ -23,6 +23,12 @@ $ choco install ntop.portable
 $ scoop install ntop
 ```
 
+### Winget
+
+```sh
+$ winget install gsass1.NTop
+```
+
 ## Usage
 
 ### Options
