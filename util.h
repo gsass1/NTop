@@ -33,4 +33,21 @@ void *xmalloc(size_t size);
 void *xrealloc(void *ptr, size_t size);
 void *xcalloc(size_t num, size_t size);
 
+#ifdef UNICODE
+	/*
+	 * Zero extension is correct for converting any legal ASCII char
+	 * to its corresponding UTF-16LE code unit
+	 */
+	#define TCharFromAscii(c) ((TCHAR)(unsigned char)c)
+#else
+	#define TCharFromAscii(c) (c)
+#endif
+
+/*
+ * Use these zero-extending functions to defend against stdlib undefined behavior
+ * specified by the is*-family of ctype functions
+ */
+#define IntFromTChar(t) ((int)(unsigned int)t)
+#define IntFromChar(c) ((int)(unsigned int)c)
+
 #endif

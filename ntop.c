@@ -69,7 +69,7 @@ static int ConPrintf(TCHAR *Fmt, ...)
 	return CharsWritten;
 }
 
-static void ConPutc(char c)
+static void ConPutc(TCHAR c)
 {
 	DWORD Dummy;
 	WriteConsole(ConsoleHandle, &c, 1, &Dummy, 0);
@@ -924,13 +924,13 @@ static input_mode InputMode = EXEC;
  * fact that a Windows system cannot possibly reach an uptime of over 100 days
  * without crashing.
  */
-static void FormatTimeString(TCHAR *Buffer, ULONGLONG MS)
+static void FormatTimeString(TCHAR *Buffer, DWORD BufferSize, ULONGLONG MS)
 {
 	int Seconds = (int)(MS / 1000 % 60);
 	int Minutes = (int)(MS / 60000 % 60);
 	int Hours = (int)(MS / 3600000 % 24);
 	int Days = (int)(MS / 86400000);
-	wsprintf(Buffer, _T("%02d:%02d:%02d:%02d"), Days, Hours, Minutes, Seconds);
+	_stprintf_s(Buffer, BufferSize, _T("%02d:%02d:%02d:%02d"), Days, Hours, Minutes, Seconds);
 }
 
 static void FormatMemoryString(TCHAR *Buffer, DWORD BufferSize, unsigned __int64 Memory)
@@ -952,12 +952,12 @@ static void FormatMemoryString(TCHAR *Buffer, DWORD BufferSize, unsigned __int64
 		_tcscpy_s(Unit, _countof(Unit), _T("TB"));
 	}
 
-	sprintf_s(Buffer, BufferSize, _T("% 8.1f %s"), Value, Unit);
+	_stprintf_s(Buffer, BufferSize, _T("% 8.1f %s"), Value, Unit);
 }
 
 static void WriteBlankLine(void)
 {
-	ConPrintf(_T("%*c"), Width, ' ');
+	ConPrintf(_T("%*c"), Width, _T(' '));
 }
 
 static BOOL WINAPI CtrlHandler(DWORD signal)
@@ -984,7 +984,7 @@ static void DrawProcessListHeader(const process_list_column *Columns, int Count)
 	}
 
 	for(; CharsWritten < Width; CharsWritten++) {
-		ConPutc(' ');
+		ConPutc(_T(' '));
 	}
 }
 
@@ -1004,7 +1004,7 @@ static void DrawOptions(const options_column *Columns, int Count)
 	}
 
 	for(; CharsWritten < Width; CharsWritten++) {
-		ConPutc(' ');
+		ConPutc(_T(' '));
 	}
 }
 
@@ -1017,24 +1017,24 @@ static int DrawPercentageBar(TCHAR *Name, double Percentage, WORD Color)
 	SetColor(Config.FGHighlightColor);
 	CharsWritten += ConPrintf(_T("  %s"), Name);
 	SetColor(Config.FGColor);
-	ConPutc('[');
+	ConPutc(_T('['));
 	CharsWritten++;
 
 	int Bars = (int)((double)BAR_WIDTH * Percentage);
 	SetColor(Color);
 	for(int i = 0; i < Bars; i++) {
-		ConPutc('|');
+		ConPutc(_T('|'));
 	}
 	CharsWritten+= Bars;
 	SetColor(Config.FGColor);
 	for(int i = 0; i < BAR_WIDTH - Bars; i++) {
-		ConPutc(' ');
+		ConPutc(_T(' '));
 	}
 	CharsWritten += BAR_WIDTH - Bars;
 	SetColor(Config.BGColor);
 	CharsWritten += ConPrintf(_T("%04.1f%%"), 100.0 * Percentage);
 	SetColor(Config.FGColor);
-	ConPutc(']');
+	ConPutc(_T(']'));
 	CharsWritten++;
 	return CharsWritten;
 }
@@ -1061,7 +1061,7 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 
 	int CharsWritten = 0;
 	TCHAR UpTimeStr[TIME_STR_SIZE];
-	FormatTimeString(UpTimeStr, Process->UpTime);
+	FormatTimeString(UpTimeStr, TIME_STR_SIZE, Process->UpTime);
 
 	TCHAR MemoryStr[256];
 	FormatMemoryString(MemoryStr, _countof(MemoryStr), Process->UsedMemory);
@@ -1110,7 +1110,7 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 	}
 
 
-	ConPrintf(_T("%*c"), Width-CharsWritten+1, ' ');
+	ConPrintf(_T("%*c"), Width-CharsWritten+1, _T(' '));
 }
 
 static ULONGLONG KeyPressStart = 0;
@@ -1236,7 +1236,7 @@ static void PrintHelpEntries(const TCHAR *Name, int Count, const help_entry *Ent
 		ConPrintf(_T("\t%s\n"), Entry.Explanation);
 	}
 
-	ConPutc('\n');
+	ConPutc(_T('\n'));
 }
 
 static void PrintHelp(const TCHAR *argv0)
@@ -1373,11 +1373,11 @@ static void WriteVi(void)
 		int CharsWritten = ConPrintf(_T("\n%s"), ViMessage);
 
 		for (; CharsWritten < Width + 1; CharsWritten++) {
-			ConPutc(' ');
+			ConPutc(_T(' '));
 		}
 	} else {
 		SetColor(FOREGROUND_WHITE);
-		ConPutc('\n');
+		ConPutc(_T('\n'));
 		WriteBlankLine();
 	}
 }
@@ -1521,12 +1521,12 @@ static void ProcessInput(BOOL *Redraw)
 							*Redraw = TRUE;
 							break;
 						case '/':
-							ViEnableInput('/');
+							ViEnableInput(_T('/'));
 							ResetCaret();
 							*Redraw = TRUE;
 							break;
 						case ':':
-							ViEnableInput(':');
+							ViEnableInput(_T(':'));
 							ResetCaret();
 							*Redraw = TRUE;
 							break;
@@ -1586,13 +1586,13 @@ int _tmain(int argc, TCHAR *argv[])
 	for(int i = 1; i < argc; i++) {
 		if(argv[i][0] == _T('-') && _tcslen(argv[i]) == 2) {
 			switch(argv[i][1]) {
-			case 'C':
+			case _T('C'):
 				Monochrome = TRUE;
 				break;
-			case 'h':
+			case _T('h'):
 				PrintHelp(argv[0]);
 				return EXIT_SUCCESS;
-			case 's':
+			case _T('s'):
 				if(++i < argc) {
 					if(!GetProcessSortTypeFromName(argv[i], &ProcessSortType)) {
 						ConPrintf(_T("Unknown column: '%s'\n"), argv[i]);
@@ -1600,16 +1600,16 @@ int _tmain(int argc, TCHAR *argv[])
 					}
 				}
 				break;
-			case 'u':
+			case _T('u'):
 				if(++i < argc) {
 					FilterByUserName = TRUE;
 					_tcscpy_s(FilterUserName, UNLEN, argv[i]);
 				}
 				break;
-			case 'v':
+			case _T('v'):
 				PrintVersion();
 				return EXIT_SUCCESS;
-			case 'p':
+			case _T('p'):
 				if(++i < argc) {
 					const TCHAR *Delim = _T(",");
 					TCHAR *Context;
@@ -1689,13 +1689,13 @@ int _tmain(int argc, TCHAR *argv[])
 
 		int MenuBarOffsetX = Width / 2 - (int)_tcslen(MenuBar) / 2;
 		for(int i = 0; i < MenuBarOffsetX; i++) {
-			ConPutc(' ');
+			ConPutc(_T(' '));
 		}
 
 		ConPrintf(_T("%s"), MenuBar);
 
 		for(int i = 0; i < Width - MenuBarOffsetX - (int)_tcslen(MenuBar); i++) {
-			ConPutc(' ');
+			ConPutc(_T(' '));
 		}
 
 		SetColor(Config.FGColor);
@@ -1737,7 +1737,7 @@ int _tmain(int argc, TCHAR *argv[])
 		CharsWritten += TaskInfoChars;
 
 		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(' ');
+			ConPutc(_T(' '));
 		}
 
 		/* Memory */
@@ -1749,7 +1749,7 @@ int _tmain(int argc, TCHAR *argv[])
 		CharsWritten += ConPrintf(_T("%d GB"), (int)TotalMemory/1000);
 
 		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(' ');
+			ConPutc(_T(' '));
 		}
 
 		CharsWritten = DrawPercentageBar(_T("Pge"), UsedPageMemoryPerc, Config.PageMemoryBarColor);
@@ -1758,13 +1758,13 @@ int _tmain(int argc, TCHAR *argv[])
 		CharsWritten += ConPrintf(_T("  Uptime: "));
 
 		TCHAR Buffer[TIME_STR_SIZE];
-		FormatTimeString(Buffer, UpTime);
+		FormatTimeString(Buffer, TIME_STR_SIZE, UpTime);
 		SetColor(Config.FGColor);
 		CharsWritten +=	ConPrintf(_T("%s"), Buffer);
 		SetColor(Config.FGColor);
 
 		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(' ');
+			ConPutc(_T(' '));
 		}
 
 		WriteBlankLine();
@@ -1816,17 +1816,17 @@ int _tmain(int argc, TCHAR *argv[])
 		if (InInputMode) {
 			CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
 			if (CaretState) {
-				ConPutc('_');
+				ConPutc(_T('_'));
 				++CharsWritten;
 			}
 
 			for(; CharsWritten < Width; CharsWritten++) {
-				ConPutc(' ');
+				ConPutc(_T(' '));
 			}
 		} else if(ViMessageActive()) {
 			WriteVi();
 		} else {
-			ConPrintf(_T("\n%*c"), Width - 1, ' ');
+			ConPrintf(_T("\n%*c"), Width - 1, _T(' '));
 		}
 		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
 
