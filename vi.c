@@ -130,7 +130,7 @@ COMMAND_FUNC(exec)
 
 		if(i != Argc - 1) {
 			DWORD Length = (DWORD)_tcslen(CommandLine);
-			CommandLine[Length] = L' ';
+			CommandLine[Length] = _T(' ');
 		}
 	}
 
@@ -231,7 +231,7 @@ static void FreeCmdParseResult(cmd_parse_result *ParseResult)
 
 static TCHAR *EatSpaces(TCHAR *Str)
 {
-	while(_istspace(*Str)) {
+	while(_istspace(IntFromTChar(*Str))) {
 		Str++;
 	}
 	return Str;
@@ -239,7 +239,7 @@ static TCHAR *EatSpaces(TCHAR *Str)
 
 static BOOL IsValidCharacter(TCHAR c)
 {
-	return (_istalnum(c) || c == _T('%')) || c == '/' || c == '.';
+	return (_istalnum(IntFromTChar(c)) || c == _T('%')) || c == _T('/') || c == _T('.');
 }
 
 static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
@@ -256,17 +256,17 @@ static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
 	/*
 	 * TODO: should allow for commands to contain digits but not start with them
 	 */
-	while(_istalpha(*Str)) {
+	while(_istalpha(IntFromTChar(*Str))) {
 		Result->Name[i++] = *Str++;
 	}
 
-	Result->Name[i] = '\0';
+	Result->Name[i] = _T('\0');
 
 	/*
 	 * Do error when we stopped on an non-alphanumeric character and not on a
 	 * terminator or space
 	 */
-	if(*Str != _T('\0') && !_istspace(*Str)) {
+	if(*Str != _T('\0') && !_istspace(IntFromTChar(*Str))) {
 		/* parse error */
 		free(Result->Name);
 		return FALSE;
@@ -274,16 +274,16 @@ static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
 
 	int InQuotes = FALSE;
 
-	if(*Str != '\0') {
+	if(*Str != _T('\0')) {
 		i = 0;
 
 		/*
 		 * Read arguments
 		 */
-		while(*Str != '\0') {
+		while(*Str != _T('\0')) {
 			Str = EatSpaces(Str);
 
-			if(*Str == '\0') {
+			if(*Str == _T('\0')) {
 				break;
 			}
 
@@ -301,16 +301,16 @@ static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
 				 * until we hit a closing quote or terminator
 				 */
 				do {
-					while(_istspace(*Str) || IsValidCharacter(*Str)) {
+					while(_istspace(IntFromTChar(*Str)) || IsValidCharacter(*Str)) {
 						Result->Args[i][j++] = *Str++;
 					}
 
-					if(*Str == '\"') {
+					if(*Str == _T('\"')) {
 						++Str;
 						InQuotes = FALSE;
 						break;
 					}
-				} while(*Str != '\0');
+				} while(*Str != _T('\0'));
 			} else {
 				/*
 				 * When not inside quotes then only read single token
@@ -320,14 +320,14 @@ static BOOL ParseCommand(TCHAR *Str, cmd_parse_result *Result)
 				}
 			}
 
-			Result->Args[i][j] = '\0';
+			Result->Args[i][j] = _T('\0');
 			++i;
 
 			/*
 			 * Do error and clean up if either the string wasn't closed
 			 * or if we hit a non-alphanumeric character or non space
 			 */
-			if(InQuotes || (*Str != _T('\0') && !_istspace(*Str))) {
+			if(InQuotes || (*Str != _T('\0') && !_istspace(IntFromTChar(*Str)))) {
 				/* parse error */
 				FreeCmdParseResult(Result);
 				return FALSE;
@@ -343,7 +343,7 @@ static void TryExec(TCHAR *Str)
 	cmd_parse_result ParseResult;
 
 	/* Search has an alias */
-	if(Str[0] == '/') {
+	if(Str[0] == _T('/')) {
 		TCHAR *Args[1];
 		Args[0] = Str + 1;
 		search_func(1, Args);
@@ -371,7 +371,7 @@ static void TryExec(TCHAR *Str)
 
 void ViInit(void)
 {
-	CurrentInputStr = xcalloc(DEFAULT_STR_SIZE, 1);
+	CurrentInputStr = xcalloc(DEFAULT_STR_SIZE, sizeof *CurrentInputStr);
 }
 
 void ViEnableInput(TCHAR InitialKey)
@@ -409,7 +409,7 @@ int ViHandleInputKey(KEY_EVENT_RECORD *KeyEvent)
 		break;
 	case VK_BACK:
 		if(InputIndex != 0) {
-			CurrentInputStr[--InputIndex] = '\0';
+			CurrentInputStr[--InputIndex] = _T('\0');
 			if(InputIndex == 0) {
 				ViDisableInput();
 			}
@@ -423,8 +423,8 @@ int ViHandleInputKey(KEY_EVENT_RECORD *KeyEvent)
 		ViExecInput();
 		return 1;
 	default:
-		if(isprint(KeyEvent->uChar.AsciiChar)) {
-			CurrentInputStr[InputIndex++] = KeyEvent->uChar.AsciiChar;
+		if(isprint(IntFromChar(KeyEvent->uChar.AsciiChar))) {
+			CurrentInputStr[InputIndex++] = TCharFromAscii(KeyEvent->uChar.AsciiChar);
 			return 1;
 		}
 	}
@@ -439,14 +439,14 @@ void ViExecInput(void)
 	/*
 	 * Ignore all preceeding colons and spaces
 	 */
-	while(*Cmd == ':' || _istspace(*Cmd)) {
+	while(*Cmd == _T(':') || _istspace(IntFromTChar(*Cmd))) {
 		Cmd++;
 	}
 
 	/*
 	 * We check for empty string here because empty strings shouldn't throw errors
 	 */
-	if(*Cmd != '\0') {
+	if(*Cmd != _T('\0')) {
 		TryExec(Cmd);
 		PushToHistory(CurrentInputStr);
 	}
