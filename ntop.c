@@ -39,6 +39,8 @@
 #define SCROLL_INTERVAL 20ULL
 #define INPUT_LOOP_DELAY 30
 #define CARET_INTERVAL 500
+#define MAX_NAMEPARTS 10
+#define MAX_NAMEPARTSIZE 255
 
 static int Width;
 static int Height;
@@ -508,6 +510,10 @@ static BOOL FilterByPID = FALSE;
 static DWORD PidFilterList[1024];
 static DWORD PidFilterCount;
 
+static BOOL FilterByName = FALSE;
+static TCHAR NameFilterList[MAX_NAMEPARTS][MAX_NAMEPARTSIZE+1];
+static DWORD NameFilterCount;
+
 static void SelectProcess(DWORD Index)
 {
 	SelectedProcessIndex = Index;
@@ -686,6 +692,19 @@ static void PollProcessList(DWORD UpdateTime)
 				continue;
 			}
 		}
+
+    if (FilterByName) {
+      BOOL InFilter = FALSE;
+      for(DWORD NameIndex = 0; NameIndex < NameFilterCount; NameIndex++) {
+        if(strstr(Process.ExeName, NameFilterList[NameIndex]) != NULL) {
+          InFilter = TRUE;
+        }
+      }
+
+      if (!InFilter) {
+        continue;
+      }
+    }
 
 		NewProcessList[i++] = Process;
 
@@ -1254,6 +1273,7 @@ static void PrintHelp(const TCHAR *argv0)
 		{ _T("-C"), _T("Use a monochrome color scheme.") },
 		{ _T("-h"), _T("Display this help info.") },
 		{ _T("-p PID,PID...\n"), _T("\tShow only the given PIDs.") },
+    { _T("-n NamePart,NamePart...\n"), _T("\tShow only processes containing at least one of the name parts.") },
 		{ _T("-s COLUMN\n"), _T("\tSort by this column.") },
 		{ _T("-u USERNAME\n"), _T("\tDisplay only processes of this user.") },
 		{ _T("-v"), _T("Print version.") },
@@ -1624,6 +1644,22 @@ int _tmain(int argc, TCHAR *argv[])
 					}
 				}
 				break;
+      case _T('n'):
+          if(++i < argc) {
+            const TCHAR *Delim = _T(",");
+            TCHAR *Context;
+            TCHAR *Token = _tcstok_s(argv[i], Delim, &Context);
+            while(Token && NameFilterCount < MAX_NAMEPARTS) {
+              strcpy_s(NameFilterList[NameFilterCount++], sizeof(Token) < MAX_NAMEPARTSIZE ? sizeof(Token) : MAX_NAMEPARTSIZE, Token);
+              Token = _tcstok_s(0, Delim, &Context);
+            }
+
+            if (NameFilterCount != 0) {
+              FilterByName = TRUE;
+            }
+          }
+          break;
+
 			default:
 				ConPrintf(_T("Unknown option: '%c'"), argv[i][1]);
 				return EXIT_FAILURE;
