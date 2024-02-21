@@ -3,7 +3,7 @@
   <metadata>
     <id>ntop.portable</id>
     <title>NTop</title>
-    <version>0.3.2</version>
+    <version>0.3.3</version>
     <authors>Gian Sass</authors>
     <owners>Gian Sass</owners>
     <summary>htop-like system-monitor for Windows with Vi-keybindings</summary>

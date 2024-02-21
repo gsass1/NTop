@@ -38,6 +38,7 @@ $ winget install gsass1.NTop
 | `-C` | Use monochrome color scheme. |
 | `-h` | Display help info. |
 | `-p` PID, PID... | Show only the given PIDs. |
+| `-n` NamePart, NamePart... | Show only processes containing at least one of the name parts. |
 | `-s` COLUMN | Sort by this column. |
 | `-u` USERNAME | Only display processes belonging to this user. |
 | `-v` | Print version. |
