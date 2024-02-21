@@ -9,10 +9,6 @@ on:
 
 jobs:
   build:
-    strategy:
-      matrix:
-        targetplatform: [x86, x64]
-
     runs-on: windows-latest
 
     steps:
