@@ -1,4 +1,4 @@
-﻿/* 
+/* 
  * NTop - an htop clone for Windows
  * Copyright (c) 2019 Gian Sass
  * 
@@ -549,6 +549,7 @@ static void ReadjustCursor(void)
 }
 
 static TCHAR SearchPattern[256];
+static BOOLEAN CaseInsensitiveSearch = FALSE;
 static BOOLEAN SearchActive;
 
 static void SearchNext(void);
@@ -556,13 +557,43 @@ static void SearchNext(void);
 void StartSearch(const TCHAR *Pattern)
 {
 	_tcsncpy_s(SearchPattern, 256, Pattern, 256);
+
+	// if the whole string is lower case use case insensitive search
+	CaseInsensitiveSearch = TRUE;
+	for (int i = 0; i < 256; i++)
+	{
+		if (SearchPattern[i] == 0)
+		{
+			break;
+		}
+		if (isupper(SearchPattern[i]))
+		{
+			CaseInsensitiveSearch = FALSE;
+			break;
+		}
+	}
+
 	SearchActive = TRUE;
 	SearchNext();
 }
 
 static BOOLEAN SearchMatchesProcess(const process *Process)
 {
-	return _tcsstr(Process->ExeName, SearchPattern) != 0;
+	TCHAR TempProcessName[MAX_PATH];
+	_tcsncpy_s(TempProcessName, MAX_PATH, Process->ExeName, MAX_PATH);
+	if (CaseInsensitiveSearch) // which means that the SearchPattern is already lower case,
+							   // so we convert the process name to lower case to make the
+							   // search case insensitive
+	{
+		for (int i = 0; i < MAX_PATH; i++)
+		{
+			if (TempProcessName[i] == 0)
+				break;
+			TempProcessName[i] = (TCHAR)tolower(TempProcessName[i]);
+		}
+	}
+
+	return _tcsstr(TempProcessName, SearchPattern) != 0;
 }
 
 static void SearchNext(void)
