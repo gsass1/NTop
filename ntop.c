@@ -54,6 +54,7 @@ static DWORD VisibleProcessCount;
 static WORD SavedAttributes;
 HANDLE ConsoleHandle;
 static HANDLE OldConsoleHandle;
+static BOOL InteractiveMode = TRUE;
 static CRITICAL_SECTION SyncLock;
 
 static int ConPrintf(TCHAR *Fmt, ...)
@@ -66,7 +67,7 @@ static int ConPrintf(TCHAR *Fmt, ...)
 	va_end(VaList);
 
 	DWORD Dummy;
-	WriteConsole(ConsoleHandle, Buffer, CharsWritten, &Dummy, 0);
+	WriteFile(ConsoleHandle, Buffer, CharsWritten, &Dummy, 0);
 
 	return CharsWritten;
 }
@@ -74,7 +75,7 @@ static int ConPrintf(TCHAR *Fmt, ...)
 static void ConPutc(TCHAR c)
 {
 	DWORD Dummy;
-	WriteConsole(ConsoleHandle, &c, 1, &Dummy, 0);
+	WriteFile(ConsoleHandle, &c, 1, &Dummy, 0);
 }
 
 #define FOREGROUND_WHITE (FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE)
@@ -1276,6 +1277,7 @@ static void PrintHelp(const TCHAR *argv0)
     { _T("-n NamePart,NamePart...\n"), _T("\tShow only processes containing at least one of the name parts.") },
 		{ _T("-s COLUMN\n"), _T("\tSort by this column.") },
 		{ _T("-u USERNAME\n"), _T("\tDisplay only processes of this user.") },
+		{ _T("-d"), _T("Do not run in interactive mode.") },
 		{ _T("-v"), _T("Print version.") },
 	};
 	PrintHelpEntries(_T("OPTIONS"), _countof(Options), Options);
@@ -1626,6 +1628,9 @@ int _tmain(int argc, TCHAR *argv[])
 					_tcscpy_s(FilterUserName, UNLEN, argv[i]);
 				}
 				break;
+			case _T('d'):
+				InteractiveMode = FALSE;
+				break;	
 			case _T('v'):
 				PrintVersion();
 				return EXIT_SUCCESS;
@@ -1669,25 +1674,27 @@ int _tmain(int argc, TCHAR *argv[])
 
 	InitializeCriticalSection(&SyncLock);
 	SetConsoleCtrlHandler(CtrlHandler, TRUE);
-	OldConsoleHandle = ConsoleHandle;
+	
+	if (InteractiveMode) {
+		OldConsoleHandle = ConsoleHandle;
+		ConsoleHandle = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
+							FILE_SHARE_READ|FILE_SHARE_WRITE,
+							0,
+							CONSOLE_TEXTMODE_BUFFER,
+							0);
 
-	ConsoleHandle = CreateConsoleScreenBuffer(GENERIC_READ|GENERIC_WRITE,
-						  FILE_SHARE_READ|FILE_SHARE_WRITE,
-						  0,
-						  CONSOLE_TEXTMODE_BUFFER,
-						  0);
+		if(ConsoleHandle == INVALID_HANDLE_VALUE) {
+			Die(_T("Could not create console screen buffer: %ld\n"), GetLastError());
+		}
 
-	if(ConsoleHandle == INVALID_HANDLE_VALUE) {
-		Die(_T("Could not create console screen buffer: %ld\n"), GetLastError());
+		if(!SetConsoleActiveScreenBuffer(ConsoleHandle)) {
+			Die(_T("Could not set active console screen buffer: %ld\n"), GetLastError());
+		}
+
+		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
+
+		atexit(RestoreConsole);
 	}
-
-	if(!SetConsoleActiveScreenBuffer(ConsoleHandle)) {
-		Die(_T("Could not set active console screen buffer: %ld\n"), GetLastError());
-	}
-
-	SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
-
-	atexit(RestoreConsole);
 
 	if(Monochrome) {
 		Config = MonochromeConfig;
@@ -1719,152 +1726,162 @@ int _tmain(int argc, TCHAR *argv[])
 #if _DEBUG
 		ULONGLONG T1 = GetTickCount64();
 #endif
+		if (InteractiveMode) {
+			SetConCursorPos(0, 0);
+			SetColor(Config.FGColor | Config.MenuBarColor);
 
-		SetConCursorPos(0, 0);
-		SetColor(Config.FGColor | Config.MenuBarColor);
+			int MenuBarOffsetX = Width / 2 - (int)_tcslen(MenuBar) / 2;
+			for(int i = 0; i < MenuBarOffsetX; i++) {
+				ConPutc(_T(' '));
+			}
 
-		int MenuBarOffsetX = Width / 2 - (int)_tcslen(MenuBar) / 2;
-		for(int i = 0; i < MenuBarOffsetX; i++) {
-			ConPutc(_T(' '));
-		}
+			ConPrintf(_T("%s"), MenuBar);
 
-		ConPrintf(_T("%s"), MenuBar);
+			for(int i = 0; i < Width - MenuBarOffsetX - (int)_tcslen(MenuBar); i++) {
+				ConPutc(_T(' '));
+			}
 
-		for(int i = 0; i < Width - MenuBarOffsetX - (int)_tcslen(MenuBar); i++) {
-			ConPutc(_T(' '));
-		}
-
-		SetColor(Config.FGColor);
-		WriteBlankLine();
-
-		/* CPU */
-		int CharsWritten = 0;
-
-		CharsWritten += DrawPercentageBar(_T("CPU"), CPUUsage, Config.CPUBarColor);
-
-		int CPUInfoChars = 0;
-
-		TCHAR CPUNameBuf[] = _T("  Name: ");
-
-		CPUInfoChars += (int)_tcslen(CPUNameBuf);
-		TCHAR CPUInfoBuf[256];
-		CPUInfoChars += wsprintf(CPUInfoBuf, _T("%s (%u Cores)"), CPUName, CPUCoreCount);
-
-		int TaskInfoChars = 0;
-
-		TCHAR TasksNameBuf[] = _T("  Tasks: ");
-
-		TaskInfoChars += (int)_tcsclen(TasksNameBuf);
-		TCHAR TasksInfoBuf[256];
-		TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u total, %u running"), ProcessCount, RunningProcessCount);
-
-		if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) {
-			SetColor(Config.FGHighlightColor);
-			ConPrintf(_T("%s"), CPUNameBuf);
 			SetColor(Config.FGColor);
-			ConPrintf(_T("%s"), CPUInfoBuf);
-			CharsWritten += CPUInfoChars;
-		}
-
-		SetColor(Config.FGHighlightColor);
-		ConPrintf(_T("%s"), TasksNameBuf);
-		SetColor(Config.FGColor);
-		ConPrintf(_T("%s"), TasksInfoBuf);
-		CharsWritten += TaskInfoChars;
-
-		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(_T(' '));
-		}
-
-		/* Memory */
-		CharsWritten = DrawPercentageBar(_T("Mem"), UsedMemoryPerc, Config.MemoryBarColor);
-
-		SetColor(Config.FGHighlightColor);
-		CharsWritten += ConPrintf(_T("  Size: "));
-		SetColor(Config.FGColor);
-		CharsWritten += ConPrintf(_T("%d GB"), (int)TotalMemory/1000);
-
-		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(_T(' '));
-		}
-
-		CharsWritten = DrawPercentageBar(_T("Pge"), UsedPageMemoryPerc, Config.PageMemoryBarColor);
-
-		SetColor(Config.FGHighlightColor);
-		CharsWritten += ConPrintf(_T("  Uptime: "));
-
-		TCHAR Buffer[TIME_STR_SIZE];
-		FormatTimeString(Buffer, TIME_STR_SIZE, UpTime);
-		SetColor(Config.FGColor);
-		CharsWritten +=	ConPrintf(_T("%s"), Buffer);
-		SetColor(Config.FGColor);
-
-		for(; CharsWritten < Width; CharsWritten++) {
-			ConPutc(_T(' '));
-		}
-
-		WriteBlankLine();
-
-		ProcessWindowHeight = Height - ProcessWindowPosY;
-		VisibleProcessCount = ProcessWindowHeight - 2;
-
-		const process_list_column ProcessListColumns[] = {
-			{ _T("ID"),	7 },
-			{ _T("USER"),	9 },
-			{ _T("PRI"),	3 },
-			{ _T("CPU%"),	5 },
-			{ _T("MEM"),	11 },
-			{ _T("THRD"),	4 },
-			{ _T("DISK"),	9 },
-			{ _T("TIME"),	TIME_STR_SIZE - 1 },
-			{ _T("PROCESS"),	-1 },
-		};
-
-		DrawProcessListHeader(ProcessListColumns, _countof(ProcessListColumns));
-
-		CharsWritten = 0;
-
-		EnterCriticalSection(&SyncLock);
-		DWORD Count = 0;
-		for(DWORD i = 0; i < VisibleProcessCount; i++) {
-			DWORD PID = i+ProcessIndex;
-			if(PID < ProcessCount) {
-				const process *Process = &ProcessList[PID];
-				SetConCursorPos(0, (SHORT)(i + ProcessWindowPosY));
-				WriteProcessInfo(Process, PID == SelectedProcessIndex);
-				Count++;
-			}
-		}
-		LeaveCriticalSection(&SyncLock);
-
-		SetColor(0);
-		for(DWORD i = Count; i < VisibleProcessCount - 1; i++) {
 			WriteBlankLine();
-		}
 
-		SetConCursorPos(0, (SHORT)Height-2);
+			/* CPU */
+			int CharsWritten = 0;
 
-		SetColor(FOREGROUND_WHITE);
+			CharsWritten += DrawPercentageBar(_T("CPU"), CPUUsage, Config.CPUBarColor);
 
-		/* Disable auto newline here. This allows us to fill the last row entirely
-		 * without scrolling the screen buffer accidentally which is really annoying. */
-		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|DISABLE_NEWLINE_AUTO_RETURN);
-		if (InInputMode) {
-			CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
-			if (CaretState) {
-				ConPutc(_T('_'));
-				++CharsWritten;
+			int CPUInfoChars = 0;
+
+			TCHAR CPUNameBuf[] = _T("  Name: ");
+
+			CPUInfoChars += (int)_tcslen(CPUNameBuf);
+			TCHAR CPUInfoBuf[256];
+			CPUInfoChars += wsprintf(CPUInfoBuf, _T("%s (%u Cores)"), CPUName, CPUCoreCount);
+
+			int TaskInfoChars = 0;
+
+			TCHAR TasksNameBuf[] = _T("  Tasks: ");
+
+			TaskInfoChars += (int)_tcsclen(TasksNameBuf);
+			TCHAR TasksInfoBuf[256];
+			TaskInfoChars += wsprintf(TasksInfoBuf, _T("%u total, %u running"), ProcessCount, RunningProcessCount);
+
+			if(CharsWritten + CPUInfoChars + TaskInfoChars < Width) {
+				SetColor(Config.FGHighlightColor);
+				ConPrintf(_T("%s"), CPUNameBuf);
+				SetColor(Config.FGColor);
+				ConPrintf(_T("%s"), CPUInfoBuf);
+				CharsWritten += CPUInfoChars;
 			}
+
+			SetColor(Config.FGHighlightColor);
+			ConPrintf(_T("%s"), TasksNameBuf);
+			SetColor(Config.FGColor);
+			ConPrintf(_T("%s"), TasksInfoBuf);
+			CharsWritten += TaskInfoChars;
 
 			for(; CharsWritten < Width; CharsWritten++) {
 				ConPutc(_T(' '));
 			}
-		} else if(ViMessageActive()) {
-			WriteVi();
-		} else {
-			ConPrintf(_T("\n%*c"), Width - 1, _T(' '));
+
+			/* Memory */
+			CharsWritten = DrawPercentageBar(_T("Mem"), UsedMemoryPerc, Config.MemoryBarColor);
+
+			SetColor(Config.FGHighlightColor);
+			CharsWritten += ConPrintf(_T("  Size: "));
+			SetColor(Config.FGColor);
+			CharsWritten += ConPrintf(_T("%d GB"), (int)TotalMemory/1000);
+
+			for(; CharsWritten < Width; CharsWritten++) {
+				ConPutc(_T(' '));
+			}
+
+			CharsWritten = DrawPercentageBar(_T("Pge"), UsedPageMemoryPerc, Config.PageMemoryBarColor);
+
+			SetColor(Config.FGHighlightColor);
+			CharsWritten += ConPrintf(_T("  Uptime: "));
+
+			TCHAR Buffer[TIME_STR_SIZE];
+			FormatTimeString(Buffer, TIME_STR_SIZE, UpTime);
+			SetColor(Config.FGColor);
+			CharsWritten +=	ConPrintf(_T("%s"), Buffer);
+			SetColor(Config.FGColor);
+
+			for(; CharsWritten < Width; CharsWritten++) {
+				ConPutc(_T(' '));
+			}
+
+			WriteBlankLine();
+
+			ProcessWindowHeight = Height - ProcessWindowPosY;
+			VisibleProcessCount = ProcessWindowHeight - 2;
+
+			const process_list_column ProcessListColumns[] = {
+				{ _T("ID"),	7 },
+				{ _T("USER"),	9 },
+				{ _T("PRI"),	3 },
+				{ _T("CPU%"),	5 },
+				{ _T("MEM"),	11 },
+				{ _T("THRD"),	4 },
+				{ _T("DISK"),	9 },
+				{ _T("TIME"),	TIME_STR_SIZE - 1 },
+				{ _T("PROCESS"),	-1 },
+			};
+
+			DrawProcessListHeader(ProcessListColumns, _countof(ProcessListColumns));
+
+			CharsWritten = 0;
+
+			EnterCriticalSection(&SyncLock);
+			DWORD Count = 0;
+			for(DWORD i = 0; i < VisibleProcessCount; i++) {
+				DWORD PID = i+ProcessIndex;
+				if(PID < ProcessCount) {
+					const process *Process = &ProcessList[PID];
+					SetConCursorPos(0, (SHORT)(i + ProcessWindowPosY));
+					WriteProcessInfo(Process, PID == SelectedProcessIndex);
+					Count++;
+				}
+			}
+			LeaveCriticalSection(&SyncLock);
+		
+			SetColor(0);
+			for(DWORD i = Count; i < VisibleProcessCount - 1; i++) {
+				WriteBlankLine();
+			}
+		
+			SetConCursorPos(0, (SHORT)Height-2);
+			SetColor(FOREGROUND_WHITE);
+		
+			/* Disable auto newline here. This allows us to fill the last row entirely
+			* without scrolling the screen buffer accidentally which is really annoying. */
+			SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|DISABLE_NEWLINE_AUTO_RETURN);
+			if (InInputMode) {
+				CharsWritten = ConPrintf(_T("\n%s"), CurrentInputStr);
+				if (CaretState) {
+					ConPutc(_T('_'));
+					++CharsWritten;
+				}
+
+				for(; CharsWritten < Width; CharsWritten++) {
+					ConPutc(_T(' '));
+				}
+			} else if(ViMessageActive()) {
+				WriteVi();
+			} else {
+				ConPrintf(_T("\n%*c"), Width - 1, _T(' '));
+			}
+			SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
 		}
-		SetConsoleMode(ConsoleHandle, ENABLE_PROCESSED_INPUT|ENABLE_WRAP_AT_EOL_OUTPUT);
+		else {
+			ConPrintf(_T("     ID       USER  PRI   CPU%%          MEM  THRD       DISK         TIME  PROCESS"));
+			EnterCriticalSection(&SyncLock);
+			for(DWORD i = 0; i < ProcessCount; i++) {
+				const process *Process = &ProcessList[i];
+				WriteProcessInfo(Process, FALSE);
+			}
+			LeaveCriticalSection(&SyncLock);
+			exit(EXIT_SUCCESS);
+		}
 
 #ifdef _DEBUG
 		ULONGLONG T2 = GetTickCount64();
