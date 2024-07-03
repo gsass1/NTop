@@ -1129,8 +1129,9 @@ static void WriteProcessInfo(const process *Process, BOOL Highlighted)
 				);
 	}
 
-
-	ConPrintf(_T("%*c"), Width-CharsWritten+1, _T(' '));
+	if (InteractiveMode) {
+		ConPrintf(_T("%*c"), Width-CharsWritten+1, _T(' '));
+	}
 }
 
 static ULONGLONG KeyPressStart = 0;
