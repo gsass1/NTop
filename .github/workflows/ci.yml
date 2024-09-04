@@ -16,10 +16,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+
       - name: Run CMake
         run: cmake -DCMAKE_BUILD_TYPE=Release .
+
       - name: Run Build
         run: cmake --build .
+
+      - name: Set version
+        id: set_version
+        run: echo "VERSION=v0.3.$((GITHUB_RUN_NUMBER + 4))" >> $GITHUB_ENV
 
       - name: create release
         id: create_release
@@ -27,10 +33,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.run_number }}
-          release_name: Release ${{ github.run_number }}
+          tag_name: ${{ env.VERSION }}
+          release_name: Release ${{ env.VERSION }}
           body: |
-            Release
+            ${{ github.event.head_commit.message }}
           draft: false
           prerelease: false
 
