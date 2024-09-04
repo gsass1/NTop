@@ -25,7 +25,7 @@ jobs:
 
       - name: Set version
         id: set_version
-        run: echo "VERSION=v0.3.$((GITHUB_RUN_NUMBER + 4))" >> $GITHUB_ENV
+        run: echo "VERSION=v0.3.$((github.run_number + 4))" >> $GITHUB_ENV
 
       - name: create release
         id: create_release
