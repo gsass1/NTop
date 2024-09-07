@@ -885,7 +885,7 @@ static void PollInitialSystemInfo(void)
 	CPUFrequency = (double)PerformanceFrequency.QuadPart / 1000000.0;
 
 	SYSTEM_INFO SystemInfo;
-	GetSystemInfo(&SystemInfo);
+	GetNativeSystemInfo(&SystemInfo);
 	CPUCoreCount = SystemInfo.dwNumberOfProcessors;
 
 	HKEY Key;
