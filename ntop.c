@@ -1880,6 +1880,7 @@ int _tmain(int argc, TCHAR *argv[])
 				const process *Process = &ProcessList[i];
 				WriteProcessInfo(Process, FALSE);
 			}
+			ConPrintf(_T("\n"));
 			LeaveCriticalSection(&SyncLock);
 			exit(EXIT_SUCCESS);
 		}
