@@ -1,0 +1,23 @@
+name: NTop PR CI
+
+# Trigger on every master branch push and pull request
+on:
+  pull_request:
+    branches:
+      - master
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Run CMake
+        run: cmake -DCMAKE_BUILD_TYPE=Release .
+
+      - name: Run Build
+        run: cmake --build . --config Release
