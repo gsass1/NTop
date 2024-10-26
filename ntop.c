@@ -170,34 +170,47 @@ static void ParseConfigLine(char *Line)
 
 static void ReadConfigFile(void)
 {
-	FILE *File;
-	errno_t Error;
-
-	Error = fopen_s(&File, "ntop.conf", "r");
-	if(Error != 0)
-		return;
-
-	size_t BufferSize = BUF_INCREASE;
-	size_t Offset = 0;
-	char *Buffer = xmalloc(BUF_INCREASE);
-
-	while(1) {
-		if(!fgets(Offset + Buffer, (int)(BufferSize - Offset), File)) {
-			break;
-		}
-
-		if(!feof(File) && !strchr(Buffer, '\n')) {
-			Offset = BufferSize - 1;
-			BufferSize += BUF_INCREASE;
-			Buffer = xrealloc(Buffer, BufferSize);
-		} else {
-			Offset = 0;
-			ParseConfigLine(Buffer);
-		}
+    FILE *File;
+    errno_t Error;
+    char exePath[MAX_PATH];
+    char configPath[MAX_PATH];
+    
+    // Get executable path
+    if(GetModuleFileNameA(NULL, exePath, MAX_PATH) == 0)
+        return;
+        
+    // Remove executable name to get directory
+    char *lastSlash = strrchr(exePath, '\\');
+    if(lastSlash != NULL)
+        *lastSlash = '\0';
+        
+    // Construct config file path
+    snprintf(configPath, MAX_PATH, "%s\\ntop.conf", exePath);
+    
+    Error = fopen_s(&File, configPath, "r");
+    if(Error != 0) {
+		OutputDebugStringA("Did not open config file!\n");
+        return;
 	}
-
-	free(Buffer);
-	fclose(File);
+        
+    size_t BufferSize = BUF_INCREASE;
+    size_t Offset = 0;
+    char *Buffer = xmalloc(BUF_INCREASE);
+    while(1) {
+        if(!fgets(Offset + Buffer, (int)(BufferSize - Offset), File)) {
+            break;
+        }
+        if(!feof(File) && !strchr(Buffer, '\n')) {
+            Offset = BufferSize - 1;
+            BufferSize += BUF_INCREASE;
+            Buffer = xrealloc(Buffer, BufferSize);
+        } else {
+            Offset = 0;
+            ParseConfigLine(Buffer);
+        }
+    }
+    free(Buffer);
+    fclose(File);
 }
 
 static WORD CurrentColor;
